@@ -3,6 +3,7 @@ import { useState } from 'react'
 import './Hero.css'
 
 import Button from '../../components/Button/Button'
+
 import heroBg from '../../assets/images/hero-bg.webp'
 
 function Hero() {
@@ -117,15 +118,11 @@ function Hero() {
 
           <div className="hero__advantages">
             <div className="hero__advantage">
-              Бесплатный
-              <br />
-              замер
+              Бесплатный замер
             </div>
 
             <div className="hero__advantage">
-              Монтаж за 24
-              <br />
-              часа
+              Монтаж за 24 часа
             </div>
 
             <div className="hero__advantage">
@@ -180,6 +177,25 @@ function Hero() {
               required
             />
 
+            <label className="hero__consent">
+              <input
+                type="checkbox"
+                name="privacy"
+                required
+              />
+
+              <span>
+                Я согласен на обработку персональных данных и принимаю{' '}
+                <a
+                  href="/privacy.html"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  политику обработки персональных данных
+                </a>
+              </span>
+            </label>
+
             <Button
               type="submit"
               className="hero__submit"
@@ -201,11 +217,6 @@ function Hero() {
               Не удалось отправить заявку
             </p>
           )}
-
-          <p className="hero__policy">
-            Нажимая кнопку, вы соглашаетесь с политикой
-            обработки персональных данных.
-          </p>
         </div>
       </div>
     </section>

@@ -63,8 +63,7 @@ function Advantages() {
             Преимущества натяжных потолков{' '}
             <span className="advantages__title-gradient advantages__title-gradient--blue">
               от компании
-            </span>
-            <br />
+            </span>{' '}
             <span className="advantages__title-gradient advantages__title-gradient--green">
               «Хамелеон»
             </span>

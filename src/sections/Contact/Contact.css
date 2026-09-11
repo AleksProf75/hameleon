@@ -131,6 +131,27 @@
 .contact__status--error {
   color: #ff6b6b;
 }
+.contact__consent {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin: 14px 0;
+  font-size: 12px;
+  line-height: 1.5;
+  cursor: pointer;
+  color: var(--color-text-secondary);
+}
+
+.contact__consent input {
+  flex-shrink: 0;
+  margin-top: 3px;
+}
+
+.contact__consent a {
+  color: inherit;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
 
 @keyframes contactStatusFade {
   from {

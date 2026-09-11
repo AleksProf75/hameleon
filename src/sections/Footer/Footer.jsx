@@ -66,17 +66,17 @@ function Footer() {
 
               <a
                 className="footer__privacy"
-                href="#privacy"
+                href="/privacy.html"
+                target="_blank"
+                rel="noopener noreferrer"
               >
-                Политика конфиденциальности
+                Политика обработки персональных данных
               </a>
             </div>
           </div>
 
           <div className="footer__bottom">
-            <p>
-              © «Хамелеон» 2026
-            </p>
+            <p>© «Хамелеон» 2026</p>
 
             <p>
               Натяжные потолки в Ростове-на-Дону

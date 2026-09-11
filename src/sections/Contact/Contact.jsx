@@ -1,6 +1,7 @@
 import { useState } from 'react'
 
 import './Contact.css'
+
 import Button from '../../components/Button/Button'
 
 function Contact({ calculatorData }) {
@@ -121,6 +122,25 @@ function Contact({ calculatorData }) {
                 required
               />
             </div>
+
+            <label className="contact__consent">
+              <input
+                type="checkbox"
+                name="privacy"
+                required
+              />
+
+              <span>
+                Я согласен на обработку персональных данных и принимаю{' '}
+                <a
+                  href="/privacy.html"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  политику обработки персональных данных
+                </a>
+              </span>
+            </label>
 
             <Button
               type="submit"
