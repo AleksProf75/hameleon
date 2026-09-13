@@ -28,25 +28,40 @@ function Contact({ calculatorData }) {
     setIsLoading(true)
     setStatus('')
 
+    let selectedPromotion = null
+
+    const savedPromotion = localStorage.getItem('selectedPromotion')
+
+    if (savedPromotion) {
+      try {
+        selectedPromotion = JSON.parse(savedPromotion)
+      } catch (error) {
+        console.error('Ошибка чтения выбранной акции:', error)
+      }
+    }
+
     console.log('Данные формы:', formData)
     console.log('Данные калькулятора:', calculatorData)
+    console.log('Выбранная акция:', selectedPromotion)
 
     try {
-      const response = await fetch(
-        'http://127.0.0.1:8000/api/leads',
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            name: formData.name,
-            phone: formData.phone,
-            source: calculatorData ? 'calculator' : 'contact',
-            calculator: calculatorData,
-          }),
+      const response = await fetch('/api/leads', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
         },
-      )
+        body: JSON.stringify({
+          name: formData.name,
+          phone: formData.phone,
+          source: selectedPromotion
+            ? 'promotion'
+            : calculatorData
+              ? 'calculator'
+              : 'contact',
+          calculator: calculatorData,
+          promotion: selectedPromotion,
+        }),
+      })
 
       if (!response.ok) {
         throw new Error('Ошибка отправки')
@@ -62,6 +77,10 @@ function Contact({ calculatorData }) {
         name: '',
         phone: '',
       })
+
+      if (selectedPromotion) {
+        localStorage.removeItem('selectedPromotion')
+      }
     } catch (error) {
       console.error(error)
       setStatus('error')
