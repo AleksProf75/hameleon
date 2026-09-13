@@ -50,7 +50,6 @@ function Calculator({ onCalculate }) {
       estimated_price: price,
     }
 
-    console.log('Данные калькулятора:', data)
 
     onCalculate?.(data)
 

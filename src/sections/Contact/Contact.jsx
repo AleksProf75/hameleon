@@ -40,10 +40,6 @@ function Contact({ calculatorData }) {
       }
     }
 
-    console.log('Данные формы:', formData)
-    console.log('Данные калькулятора:', calculatorData)
-    console.log('Выбранная акция:', selectedPromotion)
-
     try {
       const response = await fetch('/api/leads', {
         method: 'POST',
