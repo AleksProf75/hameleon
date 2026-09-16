@@ -29,7 +29,15 @@ app.add_middleware(
 
 
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
-TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
+
+TELEGRAM_CHAT_IDS = [
+    chat_id.strip()
+    for chat_id in os.getenv(
+        "TELEGRAM_CHAT_IDS",
+        os.getenv("TELEGRAM_CHAT_ID", ""),
+    ).split(",")
+    if chat_id.strip()
+]
 
 
 class CalculatorData(BaseModel):
@@ -54,13 +62,11 @@ class LeadCreate(BaseModel):
         min_length=2,
         max_length=100,
     )
-
     phone: str | None = Field(
         default=None,
         min_length=10,
         max_length=30,
     )
-
     source: str = "contact"
     calculator: CalculatorData | None = None
     promotion: PromotionData | None = None
@@ -105,7 +111,6 @@ def format_lead_message(lead: LeadCreate) -> str:
 
     if lead.calculator:
         calculator = lead.calculator
-
         price = calculator.estimated_price
 
         if price is not None:
@@ -133,9 +138,9 @@ async def send_to_telegram(message: str):
             "В .env отсутствует TELEGRAM_BOT_TOKEN"
         )
 
-    if not TELEGRAM_CHAT_ID:
+    if not TELEGRAM_CHAT_IDS:
         raise RuntimeError(
-            "В .env отсутствует TELEGRAM_CHAT_ID"
+            "В .env отсутствует TELEGRAM_CHAT_IDS"
         )
 
     url = (
@@ -143,21 +148,35 @@ async def send_to_telegram(message: str):
         f"bot{TELEGRAM_BOT_TOKEN}/sendMessage"
     )
 
-    payload = {
-        "chat_id": TELEGRAM_CHAT_ID,
-        "text": message,
-    }
+    errors = []
 
     async with httpx.AsyncClient() as client:
-        response = await client.post(
-            url,
-            json=payload,
-            timeout=10.0,
-        )
+        for chat_id in TELEGRAM_CHAT_IDS:
+            payload = {
+                "chat_id": chat_id,
+                "text": message,
+            }
 
-    if response.status_code != 200:
+            try:
+                response = await client.post(
+                    url,
+                    json=payload,
+                    timeout=10.0,
+                )
+
+                if response.status_code != 200:
+                    errors.append(
+                        f"{chat_id}: {response.text}"
+                    )
+
+            except Exception as error:
+                errors.append(
+                    f"{chat_id}: {error}"
+                )
+
+    if errors:
         raise RuntimeError(
-            f"Ошибка Telegram: {response.text}"
+            "Ошибки Telegram: " + "; ".join(errors)
         )
 
 
