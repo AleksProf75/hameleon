@@ -134,6 +134,8 @@ def format_lead_message(lead: LeadCreate) -> str:
 
         return (
             "🔥 Новая заявка по акции — Хамелеон\n\n"
+            f"👤 Имя: {lead.name}\n"
+            f"📞 Телефон: {lead.phone}\n\n"
             f"🎁 Акция: {promotion.title}\n"
             f"💰 Предложение: {promotion.value}\n\n"
             f"{promotion.text or ''}\n\n"
