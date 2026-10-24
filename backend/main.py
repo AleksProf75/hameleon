@@ -128,8 +128,18 @@ def health():
     }
 
 
+SOURCE_LABELS = {
+    "contact": "форма «Бесплатный замер»",
+    "calculator": "калькулятор",
+    "promotion": "раздел «Акции»",
+    "hero_discount": "главный экран",
+}
+
+
 def format_lead_message(lead: LeadCreate) -> str:
-    if lead.source == "promotion" and lead.promotion:
+    source_label = SOURCE_LABELS.get(lead.source, lead.source)
+
+    if lead.promotion:
         promotion = lead.promotion
 
         return (
@@ -139,7 +149,7 @@ def format_lead_message(lead: LeadCreate) -> str:
             f"🎁 Акция: {promotion.title}\n"
             f"💰 Предложение: {promotion.value}\n\n"
             f"{promotion.text or ''}\n\n"
-            "📍 Источник: раздел «Акции»"
+            f"📍 Источник: {source_label}"
         )
 
     message = "🦎 Новая заявка — Хамелеон\n\n"
@@ -150,7 +160,7 @@ def format_lead_message(lead: LeadCreate) -> str:
     if lead.phone:
         message += f"📞 Телефон: {lead.phone}\n"
 
-    message += f"📍 Источник: {lead.source}\n"
+    message += f"📍 Источник: {source_label}\n"
 
     if lead.calculator:
         calculator = lead.calculator
