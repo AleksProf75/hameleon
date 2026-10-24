@@ -14,6 +14,7 @@ function Hero() {
 
   const [status, setStatus] = useState('')
   const [isLoading, setIsLoading] = useState(false)
+  const [openedAt] = useState(() => Date.now())
 
   const handleChange = (event) => {
     const { name, value } = event.target
@@ -47,9 +48,16 @@ function Hero() {
               value: '20%',
               text: 'Заявка на бесплатный замер с главного экрана',
             },
+            website: event.target.elements.website.value,
+            form_elapsed_ms: Date.now() - openedAt,
           }),
         },
       )
+
+      if (response.status === 429) {
+        setStatus('rate_limit')
+        return
+      }
 
       if (!response.ok) {
         throw new Error('Ошибка отправки заявки')
@@ -177,6 +185,16 @@ function Hero() {
               required
             />
 
+            {/* Поле-ловушка для ботов: человек его не видит */}
+            <input
+              type="text"
+              name="website"
+              tabIndex={-1}
+              autoComplete="off"
+              aria-hidden="true"
+              style={{ position: 'absolute', left: '-10000px' }}
+            />
+
             <label className="hero__consent">
               <input
                 type="checkbox"
@@ -215,6 +233,12 @@ function Hero() {
           {status === 'error' && (
             <p className="hero__status hero__status--error">
               Не удалось отправить заявку
+            </p>
+          )}
+
+          {status === 'rate_limit' && (
+            <p className="hero__status hero__status--error">
+              Слишком много заявок. Попробуйте через несколько минут.
             </p>
           )}
         </div>

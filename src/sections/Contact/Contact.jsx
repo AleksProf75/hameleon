@@ -12,6 +12,7 @@ function Contact({ calculatorData }) {
 
   const [status, setStatus] = useState('')
   const [isLoading, setIsLoading] = useState(false)
+  const [openedAt] = useState(() => Date.now())
 
   const handleChange = (event) => {
     const { name, value } = event.target
@@ -56,8 +57,15 @@ function Contact({ calculatorData }) {
               : 'contact',
           calculator: calculatorData,
           promotion: selectedPromotion,
+          website: event.target.elements.website.value,
+          form_elapsed_ms: Date.now() - openedAt,
         }),
       })
+
+      if (response.status === 429) {
+        setStatus('rate_limit')
+        return
+      }
 
       if (!response.ok) {
         throw new Error('Ошибка отправки')
@@ -132,6 +140,16 @@ function Contact({ calculatorData }) {
                 onChange={handleChange}
                 required
               />
+
+              {/* Поле-ловушка для ботов: человек его не видит */}
+              <input
+                type="text"
+                name="website"
+                tabIndex={-1}
+                autoComplete="off"
+                aria-hidden="true"
+                style={{ position: 'absolute', left: '-10000px' }}
+              />
             </div>
 
             <label className="contact__consent">
@@ -171,6 +189,12 @@ function Contact({ calculatorData }) {
             {status === 'error' && (
               <p className="contact__status contact__status--error">
                 Не удалось отправить заявку. Попробуйте ещё раз.
+              </p>
+            )}
+
+            {status === 'rate_limit' && (
+              <p className="contact__status contact__status--error">
+                Слишком много заявок. Попробуйте через несколько минут.
               </p>
             )}
           </form>

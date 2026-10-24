@@ -1,11 +1,13 @@
 import logging
 import os
+import time
 import uuid
+from collections import deque
 from typing import Literal
 
 import httpx
 from dotenv import load_dotenv
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
@@ -97,6 +99,11 @@ class LeadCreate(BaseModel):
     calculator: CalculatorData | None = None
     promotion: PromotionData | None = None
 
+    # Защита от ботов: скрытое поле, которое человек не видит и не заполняет,
+    # и время от открытия страницы до отправки формы
+    website: str | None = Field(default=None, max_length=200)
+    form_elapsed_ms: int | None = Field(default=None, ge=0)
+
     @field_validator("phone")
     @classmethod
     def validate_phone(cls, value: str) -> str:
@@ -111,6 +118,50 @@ class LeadCreate(BaseModel):
             raise ValueError("Некорректный номер телефона")
 
         return value
+
+
+# Человек не успевает заполнить форму быстрее, чем за 2 секунды
+MIN_FORM_FILL_MS = 2000
+
+# Ограничение частоты заявок. Хранится в памяти процесса и сбрасывается
+# при перезапуске API — для одного процесса uvicorn этого достаточно.
+RATE_WINDOW_SECONDS = 10 * 60
+RATE_LIMIT_PER_IP = 5
+RATE_LIMIT_TOTAL = 30
+
+_requests_by_ip: dict[str, deque] = {}
+_requests_total: deque = deque()
+
+
+def _prune(timestamps: deque, now: float) -> None:
+    while timestamps and now - timestamps[0] > RATE_WINDOW_SECONDS:
+        timestamps.popleft()
+
+
+def check_rate_limit(client_ip: str) -> bool:
+    """Возвращает False, если лимит заявок превышен."""
+    now = time.monotonic()
+
+    _prune(_requests_total, now)
+
+    for ip in list(_requests_by_ip):
+        _prune(_requests_by_ip[ip], now)
+
+        if not _requests_by_ip[ip]:
+            del _requests_by_ip[ip]
+
+    ip_requests = _requests_by_ip.setdefault(client_ip, deque())
+
+    if (
+        len(ip_requests) >= RATE_LIMIT_PER_IP
+        or len(_requests_total) >= RATE_LIMIT_TOTAL
+    ):
+        return False
+
+    ip_requests.append(now)
+    _requests_total.append(now)
+
+    return True
 
 
 @app.get("/")
@@ -258,7 +309,7 @@ async def send_to_telegram(message: str, request_id: str) -> int:
 
 
 @app.post("/api/leads")
-async def create_lead(lead: LeadCreate):
+async def create_lead(lead: LeadCreate, request: Request):
     request_id = uuid.uuid4().hex[:12]
 
     # Имя, телефон и детали расчёта в журнал не пишем
@@ -267,6 +318,47 @@ async def create_lead(lead: LeadCreate):
         request_id,
         lead.source,
     )
+
+    if lead.website:
+        # Бот заполнил скрытое поле. Отвечаем «успешно», чтобы он
+        # не подбирал обход, но в Telegram ничего не отправляем.
+        logger.warning(
+            "request_id=%s отклонено: заполнено скрытое поле",
+            request_id,
+        )
+
+        return {
+            "status": "success",
+            "message": "Заявка отправлена",
+        }
+
+    if (
+        lead.form_elapsed_ms is not None
+        and lead.form_elapsed_ms < MIN_FORM_FILL_MS
+    ):
+        logger.warning(
+            "request_id=%s отклонено: форма заполнена за %d мс",
+            request_id,
+            lead.form_elapsed_ms,
+        )
+
+        raise HTTPException(
+            status_code=400,
+            detail="Не удалось отправить заявку. Попробуйте ещё раз.",
+        )
+
+    client_ip = request.client.host if request.client else "unknown"
+
+    if not check_rate_limit(client_ip):
+        logger.warning(
+            "request_id=%s отклонено: превышен лимит заявок",
+            request_id,
+        )
+
+        raise HTTPException(
+            status_code=429,
+            detail="Слишком много заявок. Попробуйте через несколько минут.",
+        )
 
     message = format_lead_message(lead)
 
