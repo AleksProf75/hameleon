@@ -43,11 +43,7 @@ function Hero() {
             name: formData.name,
             phone: formData.phone,
             source: 'hero_discount',
-            promotion: {
-              title: 'Месяц мега-скидок',
-              value: '20%',
-              text: 'Заявка на бесплатный замер с главного экрана',
-            },
+            promotion_id: 'hero_discount_20',
             website: event.target.elements.website.value,
             form_elapsed_ms: Date.now() - openedAt,
           }),

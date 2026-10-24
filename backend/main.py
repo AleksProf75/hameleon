@@ -1,4 +1,5 @@
 import logging
+import math
 import os
 import time
 import uuid
@@ -60,12 +61,74 @@ TELEGRAM_CHAT_IDS = [
 ]
 
 
+# Акции определяет сервер, а не браузер: сайт присылает только ID акции.
+# Тексты должны совпадать с карточками в src/sections/Promotions/Promotions.jsx
+# и формой на главном экране src/sections/Hero/Hero.jsx.
+PROMOTIONS = {
+    "hero_discount_20": {
+        "title": "Месяц мега-скидок",
+        "value": "20%",
+        "text": "Заявка на бесплатный замер с главного экрана",
+    },
+    "svo_discount_10": {
+        "title": "Скидка участникам СВО и семьям",
+        "value": "10%",
+        "text": "Скидка 10% на услуги компании при заказе от 9 500 ₽. Условия уточняйте у специалиста.",
+    },
+    "combined_discount_25": {
+        "title": "Суммируем скидки",
+        "value": "25%",
+        "text": "Комбинация акционных условий 10 + 10 + 5. Подробности расскажет инженер по замеру.",
+    },
+    "successful_day_12": {
+        "title": "«Успешный день»",
+        "value": "12%",
+        "text": "При заключении договора в день замера действует скидка 12% на работы «под ключ».",
+    },
+    "design_project_3d": {
+        "title": "Дизайн-проект бесплатно",
+        "value": "3D",
+        "text": "Для нестандартных конструкций подготовим визуализацию будущего потолка.",
+    },
+    "lights_discount_20": {
+        "title": "Светильники со скидкой",
+        "value": "20%",
+        "text": "При покупке натяжного потолка специальные LED-светильники доступны со скидкой 20%.",
+    },
+    "measurement_bonus_500": {
+        "title": "Дополнительная скидка за замер",
+        "value": "500 ₽",
+        "text": "Запишитесь на бесплатный замер и получите ещё одну персональную выгоду.",
+    },
+}
+
+PromotionId = Literal[
+    "hero_discount_20",
+    "svo_discount_10",
+    "combined_discount_25",
+    "successful_day_12",
+    "design_project_3d",
+    "lights_discount_20",
+    "measurement_bonus_500",
+]
+
+
+# Цены калькулятора. Должны совпадать с src/sections/Calculator/Calculator.jsx
+PRICE_PER_M2 = {
+    "Матовый": 450,
+    "Глянцевый": 500,
+    "Сатиновый": 480,
+    "Тканевый": 900,
+}
+PRICE_PER_CORNER = 150
+PRICE_PER_LIGHT = 300
+
+
 class CalculatorData(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     width: float = Field(ge=1, le=100)
     length: float = Field(ge=1, le=100)
-    area: float | None = Field(default=None, ge=0, le=10000)
     ceiling_type: Literal[
         "Матовый",
         "Глянцевый",
@@ -74,10 +137,30 @@ class CalculatorData(BaseModel):
     ]
     corners: int = Field(ge=4, le=100)
     lights: int = Field(ge=0, le=500)
-    estimated_price: int | None = Field(default=None, ge=0, le=100_000_000)
+
+    # Старые версии сайта присылали площадь и цену. Поля принимаются,
+    # чтобы не ломать открытые в браузерах страницы, но не используются:
+    # сервер всегда считает их сам.
+    area: float | None = Field(default=None, exclude=True)
+    estimated_price: int | None = Field(default=None, exclude=True)
+
+    def calculated_area(self) -> float:
+        return math.floor(self.width * self.length * 10 + 0.5) / 10
+
+    def calculated_price(self) -> int:
+        total = (
+            self.calculated_area() * PRICE_PER_M2[self.ceiling_type]
+            + self.corners * PRICE_PER_CORNER
+            + self.lights * PRICE_PER_LIGHT
+        )
+
+        return max(0, math.floor(total / 100 + 0.5) * 100)
 
 
 class PromotionData(BaseModel):
+    """Акция в старом формате (текстом). Её присылают страницы,
+    открытые до обновления сайта, и акции, сохранённые в браузере."""
+
     model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
 
     title: str = Field(min_length=1, max_length=100)
@@ -97,6 +180,7 @@ class LeadCreate(BaseModel):
         "hero_discount",
     ] = "contact"
     calculator: CalculatorData | None = None
+    promotion_id: PromotionId | None = None
     promotion: PromotionData | None = None
 
     # Защита от ботов: скрытое поле, которое человек не видит и не заполняет,
@@ -187,51 +271,61 @@ SOURCE_LABELS = {
 }
 
 
-def format_lead_message(lead: LeadCreate) -> str:
-    source_label = SOURCE_LABELS.get(lead.source, lead.source)
+def resolve_promotion(lead: LeadCreate) -> dict | None:
+    """Находит акцию в списке сервера. Тексту из браузера не доверяем."""
+    if lead.promotion_id:
+        return PROMOTIONS[lead.promotion_id]
 
     if lead.promotion:
-        promotion = lead.promotion
+        # Старый формат: ищем акцию с таким же названием и выгодой
+        for promotion in PROMOTIONS.values():
+            if (
+                promotion["title"] == lead.promotion.title
+                and promotion["value"] == lead.promotion.value
+            ):
+                return promotion
 
-        return (
+        logger.warning("получена неизвестная акция, она не будет указана")
+
+    return None
+
+
+def format_lead_message(lead: LeadCreate) -> str:
+    source_label = SOURCE_LABELS.get(lead.source, lead.source)
+    promotion = resolve_promotion(lead)
+
+    if promotion:
+        message = (
             "🔥 Новая заявка по акции — Хамелеон\n\n"
             f"👤 Имя: {lead.name}\n"
             f"📞 Телефон: {lead.phone}\n\n"
-            f"🎁 Акция: {promotion.title}\n"
-            f"💰 Предложение: {promotion.value}\n\n"
-            f"{promotion.text or ''}\n\n"
-            f"📍 Источник: {source_label}"
+            f"🎁 Акция: {promotion['title']}\n"
+            f"💰 Предложение: {promotion['value']}\n\n"
+            f"{promotion['text']}\n"
         )
-
-    message = "🦎 Новая заявка — Хамелеон\n\n"
-
-    if lead.name:
-        message += f"👤 Имя: {lead.name}\n"
-
-    if lead.phone:
-        message += f"📞 Телефон: {lead.phone}\n"
-
-    message += f"📍 Источник: {source_label}\n"
+    else:
+        message = (
+            "🦎 Новая заявка — Хамелеон\n\n"
+            f"👤 Имя: {lead.name}\n"
+            f"📞 Телефон: {lead.phone}\n"
+        )
 
     if lead.calculator:
         calculator = lead.calculator
-        price = calculator.estimated_price
-
-        if price is not None:
-            formatted_price = f"{price:,}".replace(",", " ")
-        else:
-            formatted_price = "не рассчитана"
+        formatted_price = f"{calculator.calculated_price():,}".replace(",", " ")
 
         message += (
             "\n📐 Расчёт потолка:\n"
             f"Ширина: {calculator.width} м\n"
             f"Длина: {calculator.length} м\n"
-            f"Площадь: {calculator.area} м²\n"
+            f"Площадь: {calculator.calculated_area()} м²\n"
             f"Тип потолка: {calculator.ceiling_type}\n"
             f"Углов: {calculator.corners}\n"
             f"Светильников: {calculator.lights}\n"
             f"Предварительная стоимость: {formatted_price} ₽\n"
         )
+
+    message += f"\n📍 Источник: {source_label}"
 
     return message
 

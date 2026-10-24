@@ -40,14 +40,13 @@ function Calculator({ onCalculate }) {
   const formattedPrice = new Intl.NumberFormat('ru-RU').format(price)
 
   const handleExactCalculation = () => {
+    // Площадь и цену сервер пересчитывает сам по этим параметрам
     const data = {
       width: Number(width),
       length: Number(length),
-      area,
       ceiling_type: ceilingType,
       corners: Number(corners),
       lights: Number(lights),
-      estimated_price: price,
     }
 
 

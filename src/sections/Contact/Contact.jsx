@@ -56,7 +56,9 @@ function Contact({ calculatorData }) {
               ? 'calculator'
               : 'contact',
           calculator: calculatorData,
-          promotion: selectedPromotion,
+          promotion_id: selectedPromotion?.id,
+          // Акция, сохранённая старой версией сайта (без ID)
+          promotion: selectedPromotion?.id ? undefined : selectedPromotion,
           website: event.target.elements.website.value,
           form_elapsed_ms: Date.now() - openedAt,
         }),
