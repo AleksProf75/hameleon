@@ -63,10 +63,6 @@ function Contact({ calculatorData }) {
         throw new Error('Ошибка отправки')
       }
 
-      const data = await response.json()
-
-      console.log('Ответ сервера:', data)
-
       setStatus('success')
 
       setFormData({
