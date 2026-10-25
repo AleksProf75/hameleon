@@ -129,6 +129,42 @@ with TestClient(main.app) as client:
         "username": "vera", "display_name": "Вера", "password": "long-password-1",
     }).status_code == 200, "администратор создал менеджера")
 
+    # --- Настройки сайта ---
+    check(client.get("/api/site/settings").json()["hero"]["value"] == "20%",
+          "сайт получает настройки по умолчанию")
+
+    settings = client.get("/api/admin/settings").json()
+    settings["calculator"]["types"] = [{"name": "Матовый", "price_per_m2": 1000}]
+    settings["promotions"].append({
+        "value": "5%", "title": "Новая акция", "text": "", "button": "Хочу",
+    })
+    saved = client.put("/api/admin/settings", headers=admin, json=settings)
+    check(saved.status_code == 200, "администратор сохранил акции и цены")
+    new_promo_id = saved.json()["promotions"][-1]["id"]
+    check(new_promo_id.startswith("promo_"), "новой акции присвоен ID")
+
+    check(client.get("/api/site/settings").json()["calculator"]["types"][0]["price_per_m2"] == 1000,
+          "сайт видит новые цены")
+
+    bad = {**settings, "price_cards": settings["price_cards"][:2]}
+    check(client.put("/api/admin/settings", headers=admin, json=bad).status_code == 422,
+          "неполный прайс не сохраняется")
+
+    lead = {**LEAD, "promotion_id": new_promo_id, "phone": "+7 999 000-00-01"}
+    check(client.post("/api/leads", json=lead).status_code == 200, "заявка с новой акцией принята")
+    check(client.post("/api/leads", json={
+        **LEAD, "calculator": {**LEAD["calculator"], "ceiling_type": "Глянцевый"},
+    }).status_code == 422, "удалённый тип потолка отклонён")
+
+    newest = client.get("/api/admin/leads").json()[0]
+    detail = client.get(f"/api/admin/leads/{newest['id']}").json()["lead"]
+    check(detail["details"]["Стоимость, ₽"] == 23400 and "Новая акция" in detail["promotion"],
+          "цена и акция в заявке взяты из новых настроек")
+
+    boris = login(client, "boris")
+    check(client.get("/api/admin/settings").status_code == 403, "менеджеру настройки закрыты")
+    admin = login(client, "admin")
+
     # --- Чат ---
     client.cookies.clear()
     started = client.post("/api/chat/start", json={"name": "Ольга", "text": "Сколько стоит?"})

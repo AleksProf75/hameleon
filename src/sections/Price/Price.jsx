@@ -5,6 +5,7 @@ import price02 from '../../assets/images/prices/price-2.jpg'
 import price03 from '../../assets/images/prices/price-3.jpg'
 import price04 from '../../assets/images/prices/price-4.png'
 import price05 from '../../assets/images/prices/price-5.jpg'
+import { useSiteSettings } from '../../siteSettings'
 
 const priceItems = [
   {
@@ -45,6 +46,8 @@ const priceItems = [
 ]
 
 function Price() {
+  const { price_cards: priceCards } = useSiteSettings()
+
   return (
     <section className="price" id="price">
       <div className="container">
@@ -54,11 +57,15 @@ function Price() {
           </h2>
 
           <div className="price__grid">
-            {priceItems.map((item) => (
+            {priceItems.map((card, index) => ({
+              ...card,
+              // Тексты карточек меняются в панели, картинки и расположение — нет
+              ...priceCards[index],
+            })).map((item) => (
               <a
                 className={`price__card ${item.className}`}
                 href="#measurement"
-                key={item.title}
+                key={item.className}
               >
                 <img
                   className="price__image"

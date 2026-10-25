@@ -12,6 +12,7 @@ from pydantic import BaseModel, ConfigDict, Field
 import auth
 import crm
 import db
+import site_settings
 import telegram_bot
 
 
@@ -303,6 +304,24 @@ def chat_reply(chat_id: int, data: CommentRequest, user: dict = Depends(auth.cur
 def chat_status(chat_id: int, data: ChatStatusRequest, user: dict = Depends(auth.current_user)):
     crm.set_chat_status(chat_id, data.status)
     return {"status": "ok"}
+
+
+# ---------- Настройки сайта (только администратор) ----------
+
+@router.get("/settings")
+def get_settings(admin: dict = Depends(auth.require_admin)):
+    return site_settings.get()
+
+
+@router.put("/settings")
+def put_settings(data: site_settings.SiteSettings, admin: dict = Depends(auth.require_admin)):
+    try:
+        saved = site_settings.save(data, admin["id"])
+    except ValueError as error:
+        raise HTTPException(status_code=400, detail=str(error))
+
+    logger.info("настройки сайта изменены: логин=%s", admin["username"])
+    return saved
 
 
 # ---------- Пользователи (только администратор) ----------

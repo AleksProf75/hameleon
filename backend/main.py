@@ -9,7 +9,7 @@ from contextlib import asynccontextmanager
 from typing import Literal
 
 from dotenv import load_dotenv
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import FastAPI, HTTPException, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
@@ -21,6 +21,7 @@ import admin_api  # noqa: E402
 import chat_api  # noqa: E402
 import crm  # noqa: E402
 import db  # noqa: E402
+import site_settings  # noqa: E402
 import telegram_bot  # noqa: E402
 
 
@@ -80,80 +81,16 @@ if CORS_ORIGINS:
     )
 
 
-# Акции определяет сервер, а не браузер: сайт присылает только ID акции.
-# Тексты должны совпадать с карточками в src/sections/Promotions/Promotions.jsx
-# и формой на главном экране src/sections/Hero/Hero.jsx.
-PROMOTIONS = {
-    "hero_discount_20": {
-        "title": "Месяц мега-скидок",
-        "value": "20%",
-        "text": "Заявка на бесплатный замер с главного экрана",
-    },
-    "svo_discount_10": {
-        "title": "Скидка участникам СВО и семьям",
-        "value": "10%",
-        "text": "Скидка 10% на услуги компании при заказе от 9 500 ₽. Условия уточняйте у специалиста.",
-    },
-    "combined_discount_25": {
-        "title": "Суммируем скидки",
-        "value": "25%",
-        "text": "Комбинация акционных условий 10 + 10 + 5. Подробности расскажет инженер по замеру.",
-    },
-    "successful_day_12": {
-        "title": "«Успешный день»",
-        "value": "12%",
-        "text": "При заключении договора в день замера действует скидка 12% на работы «под ключ».",
-    },
-    "design_project_3d": {
-        "title": "Дизайн-проект бесплатно",
-        "value": "3D",
-        "text": "Для нестандартных конструкций подготовим визуализацию будущего потолка.",
-    },
-    "lights_discount_20": {
-        "title": "Светильники со скидкой",
-        "value": "20%",
-        "text": "При покупке натяжного потолка специальные LED-светильники доступны со скидкой 20%.",
-    },
-    "measurement_bonus_500": {
-        "title": "Дополнительная скидка за замер",
-        "value": "500 ₽",
-        "text": "Запишитесь на бесплатный замер и получите ещё одну персональную выгоду.",
-    },
-}
-
-PromotionId = Literal[
-    "hero_discount_20",
-    "svo_discount_10",
-    "combined_discount_25",
-    "successful_day_12",
-    "design_project_3d",
-    "lights_discount_20",
-    "measurement_bonus_500",
-]
-
-
-# Цены калькулятора. Должны совпадать с src/sections/Calculator/Calculator.jsx
-PRICE_PER_M2 = {
-    "Матовый": 450,
-    "Глянцевый": 500,
-    "Сатиновый": 480,
-    "Тканевый": 900,
-}
-PRICE_PER_CORNER = 150
-PRICE_PER_LIGHT = 300
-
+# Акции и цены калькулятора хранятся в настройках сайта (site_settings.py),
+# их меняет администратор в панели. Сайт присылает только ID акции
+# и параметры потолка, а условия и цену сервер берёт из настроек.
 
 class CalculatorData(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     width: float = Field(ge=1, le=100)
     length: float = Field(ge=1, le=100)
-    ceiling_type: Literal[
-        "Матовый",
-        "Глянцевый",
-        "Сатиновый",
-        "Тканевый",
-    ]
+    ceiling_type: str = Field(min_length=1, max_length=40)
     corners: int = Field(ge=4, le=100)
     lights: int = Field(ge=0, le=500)
 
@@ -163,14 +100,23 @@ class CalculatorData(BaseModel):
     area: float | None = Field(default=None, exclude=True)
     estimated_price: int | None = Field(default=None, exclude=True)
 
+    @field_validator("ceiling_type")
+    @classmethod
+    def known_ceiling_type(cls, value: str) -> str:
+        if value not in site_settings.ceiling_prices():
+            raise ValueError("Неизвестный тип потолка")
+
+        return value
+
     def calculated_area(self) -> float:
         return math.floor(self.width * self.length * 10 + 0.5) / 10
 
     def calculated_price(self) -> int:
+        calculator = site_settings.get()["calculator"]
         total = (
-            self.calculated_area() * PRICE_PER_M2[self.ceiling_type]
-            + self.corners * PRICE_PER_CORNER
-            + self.lights * PRICE_PER_LIGHT
+            self.calculated_area() * site_settings.ceiling_prices()[self.ceiling_type]
+            + self.corners * calculator["price_per_corner"]
+            + self.lights * calculator["price_per_light"]
         )
 
         return max(0, math.floor(total / 100 + 0.5) * 100)
@@ -199,7 +145,7 @@ class LeadCreate(BaseModel):
         "hero_discount",
     ] = "contact"
     calculator: CalculatorData | None = None
-    promotion_id: PromotionId | None = None
+    promotion_id: str | None = Field(default=None, max_length=40)
     promotion: PromotionData | None = None
 
     # Защита от ботов: скрытое поле, которое человек не видит и не заполняет,
@@ -219,6 +165,14 @@ class LeadCreate(BaseModel):
 
         if len(digits) not in (10, 11):
             raise ValueError("Некорректный номер телефона")
+
+        return value
+
+    @field_validator("promotion_id")
+    @classmethod
+    def known_promotion(cls, value: str | None) -> str | None:
+        if value is not None and not site_settings.find_promotion(value):
+            raise ValueError("Неизвестная акция")
 
         return value
 
@@ -275,6 +229,13 @@ def root():
     }
 
 
+@app.get("/api/site/settings")
+def public_site_settings(response: Response):
+    """Акции, цены калькулятора и прайс для страниц сайта."""
+    response.headers["Cache-Control"] = "public, max-age=60"
+    return site_settings.get()
+
+
 @app.get("/api/health")
 def health():
     return {
@@ -293,16 +254,16 @@ SOURCE_LABELS = {
 def resolve_promotion(lead: LeadCreate) -> dict | None:
     """Находит акцию в списке сервера. Тексту из браузера не доверяем."""
     if lead.promotion_id:
-        return PROMOTIONS[lead.promotion_id]
+        return site_settings.find_promotion(lead.promotion_id)
 
     if lead.promotion:
         # Старый формат: ищем акцию с таким же названием и выгодой
-        for promotion in PROMOTIONS.values():
-            if (
-                promotion["title"] == lead.promotion.title
-                and promotion["value"] == lead.promotion.value
-            ):
-                return promotion
+        promotion = site_settings.find_promotion_by_title(
+            lead.promotion.title, lead.promotion.value
+        )
+
+        if promotion:
+            return promotion
 
         logger.warning("получена неизвестная акция, она не будет указана")
 

@@ -2,13 +2,20 @@ import { useMemo, useState } from 'react'
 
 import './Calculator.css'
 import Button from '../../components/Button/Button'
+import { useSiteSettings } from '../../siteSettings'
 
 function Calculator({ onCalculate }) {
+  const { calculator: prices } = useSiteSettings()
   const [width, setWidth] = useState(4.2)
   const [length, setLength] = useState(5)
-  const [ceilingType, setCeilingType] = useState('Матовый')
+  const [selectedType, setCeilingType] = useState('Матовый')
   const [corners, setCorners] = useState(4)
   const [lights, setLights] = useState(6)
+
+  // Если администратор убрал выбранный тип, берём первый из списка
+  const ceilingType = prices.types.some((type) => type.name === selectedType)
+    ? selectedType
+    : prices.types[0].name
 
   const area = useMemo(() => {
     const result = Number(width) * Number(length)
@@ -20,22 +27,18 @@ function Calculator({ onCalculate }) {
     return Math.round(result * 10) / 10
   }, [width, length])
 
+  // Та же формула, что и на сервере (backend/main.py, CalculatorData)
   const price = useMemo(() => {
-    const priceByType = {
-      Матовый: 450,
-      Глянцевый: 500,
-      Сатиновый: 480,
-      Тканевый: 900,
-    }
+    const type = prices.types.find((item) => item.name === ceilingType)
 
-    const basePrice = area * (priceByType[ceilingType] || 450)
-    const cornersPrice = Number(corners) * 150
-    const lightsPrice = Number(lights) * 300
+    const basePrice = area * (type?.price_per_m2 || 0)
+    const cornersPrice = Number(corners) * prices.price_per_corner
+    const lightsPrice = Number(lights) * prices.price_per_light
 
     const result = basePrice + cornersPrice + lightsPrice
 
     return Math.max(0, Math.round(result / 100) * 100)
-  }, [area, ceilingType, corners, lights])
+  }, [area, ceilingType, corners, lights, prices])
 
   const formattedPrice = new Intl.NumberFormat('ru-RU').format(price)
 
@@ -118,10 +121,14 @@ function Calculator({ onCalculate }) {
                   value={ceilingType}
                   onChange={(event) => setCeilingType(event.target.value)}
                 >
-                  <option value="Матовый">Матовый</option>
-                  <option value="Глянцевый">Глянцевый</option>
-                  <option value="Сатиновый">Сатиновый</option>
-                  <option value="Тканевый">Тканевый</option>
+                  {prices.types.map((type) => (
+                    <option
+                      key={type.name}
+                      value={type.name}
+                    >
+                      {type.name}
+                    </option>
+                  ))}
                 </select>
               </label>
 

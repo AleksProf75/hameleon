@@ -5,8 +5,11 @@ import './Hero.css'
 import Button from '../../components/Button/Button'
 
 import heroBg from '../../assets/images/hero-bg.webp'
+import { useSiteSettings } from '../../siteSettings'
 
 function Hero() {
+  const { hero } = useSiteSettings()
+
   const [formData, setFormData] = useState({
     name: '',
     phone: '',
@@ -43,7 +46,7 @@ function Hero() {
             name: formData.name,
             phone: formData.phone,
             source: 'hero_discount',
-            promotion_id: 'hero_discount_20',
+            promotion_id: hero.id,
             website: event.target.elements.website.value,
             form_elapsed_ms: Date.now() - openedAt,
           }),
@@ -141,11 +144,11 @@ function Hero() {
 
         <div className="hero__form-card">
           <div className="hero__discount">
-            20%
+            {hero.value}
           </div>
 
           <h2 className="hero__form-title">
-            Месяц мега-скидок
+            {hero.title}
           </h2>
 
           <p className="hero__form-text">

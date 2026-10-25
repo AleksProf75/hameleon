@@ -88,6 +88,13 @@ CREATE TABLE IF NOT EXISTS telegram_messages (
     PRIMARY KEY (tg_chat_id, tg_message_id)
 );
 
+CREATE TABLE IF NOT EXISTS settings (
+    key TEXT PRIMARY KEY,
+    value TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    updated_by INTEGER REFERENCES users(id)
+);
+
 CREATE INDEX IF NOT EXISTS idx_leads_created ON leads(created_at);
 CREATE INDEX IF NOT EXISTS idx_lead_events_lead ON lead_events(lead_id);
 CREATE INDEX IF NOT EXISTS idx_chat_messages_chat ON chat_messages(chat_id);
