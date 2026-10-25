@@ -103,6 +103,9 @@
   .bubbles { display: flex; flex-direction: column; gap: 10px; padding: 16px; background: var(--soft); border: 1px solid var(--line); border-radius: 10px; margin: 16px 0; max-height: 55vh; overflow: auto; }
   .bubble { max-width: 75%; padding: 9px 13px; border-radius: 14px; background: #fff; border: 1px solid var(--line); word-wrap: break-word; }
   .bubble .msg { white-space: pre-wrap; }
+  /* Переписка узкой колонкой, как в мессенджере, чтобы взгляду не прыгать через весь экран */
+  #chat-detail { max-width: 720px; }
+  .bubble { max-width: 80%; }
   .bubble.visitor { align-self: flex-start; border-bottom-left-radius: 4px; }
   .bubble.manager { align-self: flex-end; background: var(--accent); border-color: var(--accent); color: #fff; border-bottom-right-radius: 4px; }
   .bubble .meta { font-size: 11px; color: var(--muted); margin-top: 3px; }
