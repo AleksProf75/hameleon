@@ -12,6 +12,7 @@ import Partners from './sections/Partners/Partners'
 import Team from './sections/Team/Team'
 import Contact from './sections/Contact/Contact'
 import Footer from './sections/Footer/Footer'
+import ChatWidget from './components/ChatWidget/ChatWidget'
 
 function App() {
   const [calculatorData, setCalculatorData] = useState(null)
@@ -41,6 +42,8 @@ function App() {
       </main>
 
       <Footer />
+
+      <ChatWidget />
     </>
   )
 }

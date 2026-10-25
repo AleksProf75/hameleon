@@ -1,0 +1,524 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Хамелеон — заявки</title>
+<style>
+  :root {
+    --bg: #f4f5f7; --card: #fff; --text: #1d2330; --muted: #6b7385;
+    --line: #e2e5ea; --accent: #2e6be6; --ok: #1f9d55; --warn: #d97706; --bad: #d14343;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font: 14px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; background: var(--bg); color: var(--text); }
+  button, input, select, textarea { font: inherit; }
+  button { cursor: pointer; border: 1px solid var(--line); background: var(--card); border-radius: 8px; padding: 7px 12px; }
+  button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  button:disabled { opacity: .5; cursor: default; }
+  input, select, textarea { border: 1px solid var(--line); border-radius: 8px; padding: 7px 10px; background: #fff; width: 100%; }
+  textarea { resize: vertical; min-height: 70px; }
+  .hidden { display: none !important; }
+  .muted { color: var(--muted); }
+  .error { color: var(--bad); min-height: 1.4em; }
+
+  #login { max-width: 340px; margin: 12vh auto; background: var(--card); padding: 28px; border-radius: 14px; box-shadow: 0 6px 24px rgba(0,0,0,.06); }
+  #login h1 { font-size: 20px; margin: 0 0 18px; }
+  #login label { display: block; margin-bottom: 12px; }
+
+  header { display: flex; align-items: center; gap: 8px; padding: 10px 16px; background: var(--card); border-bottom: 1px solid var(--line); flex-wrap: wrap; }
+  header .brand { font-weight: 700; margin-right: 12px; }
+  header nav { display: flex; gap: 4px; flex-wrap: wrap; }
+  header nav button.active { background: var(--text); color: #fff; border-color: var(--text); }
+  header .who { margin-left: auto; display: flex; gap: 8px; align-items: center; }
+
+  main { display: grid; grid-template-columns: minmax(280px, 420px) 1fr; gap: 16px; padding: 16px; height: calc(100vh - 58px); }
+  .panel { background: var(--card); border: 1px solid var(--line); border-radius: 12px; overflow: auto; }
+  .toolbar { display: flex; gap: 8px; padding: 10px; border-bottom: 1px solid var(--line); position: sticky; top: 0; background: var(--card); flex-wrap: wrap; }
+  .toolbar select { width: auto; }
+  .item { padding: 10px 12px; border-bottom: 1px solid var(--line); cursor: pointer; }
+  .item:hover { background: #f8f9fb; }
+  .item.selected { background: #eef3fd; }
+  .item .row { display: flex; justify-content: space-between; gap: 8px; }
+  .badge { font-size: 12px; padding: 1px 8px; border-radius: 10px; white-space: nowrap; }
+  .s-new { background: #fdecec; color: var(--bad); }
+  .s-in_work { background: #fff4e5; color: var(--warn); }
+  .s-done { background: #e8f6ee; color: var(--ok); }
+  .s-rejected { background: #eceef2; color: var(--muted); }
+  .detail { padding: 18px; }
+  .detail h2 { margin: 0 0 4px; font-size: 18px; }
+  .facts { display: grid; grid-template-columns: max-content 1fr; gap: 4px 14px; margin: 14px 0; }
+  .facts dt { color: var(--muted); }
+  .facts dd { margin: 0; }
+  .actions { display: flex; gap: 8px; flex-wrap: wrap; margin: 12px 0; align-items: center; }
+  .actions select { width: auto; }
+  .timeline { border-left: 2px solid var(--line); margin: 16px 0 16px 6px; padding-left: 14px; }
+  .timeline .ev { margin-bottom: 10px; }
+  .timeline .ev .meta { color: var(--muted); font-size: 12px; }
+  .bubbles { display: flex; flex-direction: column; gap: 8px; margin: 12px 0; }
+  .bubble { max-width: 75%; padding: 8px 12px; border-radius: 12px; background: #eef0f4; white-space: pre-wrap; word-wrap: break-word; }
+  .bubble.manager { align-self: flex-end; background: #e3ecfd; }
+  .bubble .meta { font-size: 11px; color: var(--muted); margin-top: 2px; }
+  table { border-collapse: collapse; width: 100%; }
+  th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  .grid-form { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 8px; align-items: end; padding: 14px; }
+  .single { grid-column: 1 / -1; }
+
+  @media (max-width: 760px) {
+    main { grid-template-columns: 1fr; height: auto; }
+    .panel { max-height: none; }
+    main.show-detail .list { display: none; }
+    main:not(.show-detail) .side { display: none; }
+  }
+  .back { display: none; }
+  @media (max-width: 760px) { .back { display: inline-block; margin-bottom: 10px; } }
+</style>
+</head>
+<body>
+
+<form id="login" class="hidden" autocomplete="on">
+  <h1>Хамелеон — вход</h1>
+  <label>Логин<input name="username" autocomplete="username" required></label>
+  <label>Пароль<input name="password" type="password" autocomplete="current-password" required></label>
+  <p class="error" id="login-error"></p>
+  <button class="primary" style="width:100%">Войти</button>
+</form>
+
+<div id="app" class="hidden">
+  <header>
+    <span class="brand">🦎 Хамелеон</span>
+    <nav>
+      <button data-tab="leads" class="active">Заявки</button>
+      <button data-tab="chats">Чаты</button>
+      <button data-tab="users" class="admin-only">Пользователи</button>
+      <button data-tab="account">Мой пароль</button>
+    </nav>
+    <div class="who"><span id="who" class="muted"></span><button id="logout">Выйти</button></div>
+  </header>
+
+  <main id="tab-leads">
+    <section class="panel list">
+      <div class="toolbar">
+        <select id="lead-status">
+          <option value="">Все статусы</option>
+          <option value="new">Новые</option>
+          <option value="in_work">В работе</option>
+          <option value="done">Выполненные</option>
+          <option value="rejected">Отказ</option>
+        </select>
+        <label class="muted" style="display:flex;gap:6px;align-items:center;width:auto">
+          <input type="checkbox" id="lead-mine" style="width:auto"> Мои
+        </label>
+      </div>
+      <div id="lead-list"></div>
+    </section>
+    <section class="panel side"><div class="detail" id="lead-detail"><p class="muted">Выберите заявку слева</p></div></section>
+  </main>
+
+  <main id="tab-chats" class="hidden">
+    <section class="panel list"><div id="chat-list"></div></section>
+    <section class="panel side"><div class="detail" id="chat-detail"><p class="muted">Выберите чат слева</p></div></section>
+  </main>
+
+  <div id="tab-users" class="hidden" style="padding:16px">
+    <section class="panel">
+      <form id="user-create" class="grid-form">
+        <strong class="single">Новый пользователь</strong>
+        <label>Логин<input name="username" required pattern="[a-zA-Z0-9_.\-]{3,50}"></label>
+        <label>Имя для отображения<input name="display_name" required></label>
+        <label>Пароль (от 10 символов)<input name="password" type="password" minlength="10" required autocomplete="new-password"></label>
+        <label>Роль<select name="role"><option value="manager">Менеджер</option><option value="admin">Администратор</option></select></label>
+        <label>Telegram ID (необязательно)<input name="telegram_user_id" inputmode="numeric"></label>
+        <button class="primary">Создать</button>
+        <p class="error single" id="user-error"></p>
+      </form>
+    </section>
+    <section class="panel" style="margin-top:16px">
+      <table>
+        <thead><tr><th>Пользователь</th><th>Роль</th><th>Telegram ID</th><th>Статус</th><th></th></tr></thead>
+        <tbody id="user-list"></tbody>
+      </table>
+    </section>
+    <p class="muted">Telegram ID менеджер может узнать, написав боту команду /myid.
+      После привязки он сможет брать заявки кнопкой «Беру» и отвечать в Telegram.</p>
+  </div>
+
+  <div id="tab-account" class="hidden" style="padding:16px;max-width:420px">
+    <section class="panel">
+      <form id="password-form" class="grid-form">
+        <strong class="single">Смена пароля</strong>
+        <label class="single">Текущий пароль<input name="old_password" type="password" required autocomplete="current-password"></label>
+        <label class="single">Новый пароль (от 10 символов)<input name="new_password" type="password" minlength="10" required autocomplete="new-password"></label>
+        <button class="primary">Сменить</button>
+        <p class="single" id="password-result"></p>
+      </form>
+    </section>
+  </div>
+</div>
+
+<script>
+'use strict'
+
+const API = '/api/admin'
+const STATUS = { new: 'Новая', in_work: 'В работе', done: 'Выполнена', rejected: 'Отказ' }
+let csrf = ''
+let me = null
+let selectedLead = null
+let selectedChat = null
+let users = []
+
+const $ = (id) => document.getElementById(id)
+
+// Всё, что пришло с сайта, выводим только через экранирование
+function esc(value) {
+  return String(value ?? '').replace(/[&<>"']/g, (c) => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
+  })[c])
+}
+
+async function api(path, options = {}) {
+  const response = await fetch(API + path, {
+    ...options,
+    credentials: 'same-origin',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-CSRF-Token': csrf,
+      ...(options.headers || {}),
+    },
+    body: options.body ? JSON.stringify(options.body) : undefined,
+  })
+
+  if (response.status === 401) {
+    showLogin()
+    throw new Error('Требуется вход')
+  }
+
+  const data = await response.json().catch(() => ({}))
+
+  if (!response.ok) {
+    const detail = Array.isArray(data.detail)
+      ? 'Проверьте заполнение полей'
+      : data.detail
+    throw new Error(detail || 'Ошибка ' + response.status)
+  }
+
+  return data
+}
+
+function showLogin() {
+  $('app').classList.add('hidden')
+  $('login').classList.remove('hidden')
+}
+
+function showApp() {
+  $('login').classList.add('hidden')
+  $('app').classList.remove('hidden')
+  $('who').textContent = me.display_name + (me.role === 'admin' ? ' · админ' : '')
+
+  document.querySelectorAll('.admin-only').forEach((el) => {
+    el.classList.toggle('hidden', me.role !== 'admin')
+  })
+
+  loadLeads()
+  if (me.role === 'admin') loadUsers()
+}
+
+$('login').addEventListener('submit', async (event) => {
+  event.preventDefault()
+  const form = new FormData(event.target)
+  $('login-error').textContent = ''
+
+  try {
+    const data = await api('/login', {
+      method: 'POST',
+      body: { username: form.get('username'), password: form.get('password') },
+    })
+    csrf = data.csrf_token
+    me = data.user
+    event.target.reset()
+    showApp()
+  } catch (error) {
+    $('login-error').textContent = error.message
+  }
+})
+
+$('logout').addEventListener('click', async () => {
+  await api('/logout', { method: 'POST' }).catch(() => {})
+  showLogin()
+})
+
+document.querySelectorAll('header nav button').forEach((button) => {
+  button.addEventListener('click', () => {
+    document.querySelectorAll('header nav button').forEach((b) => b.classList.remove('active'))
+    button.classList.add('active')
+
+    for (const tab of ['leads', 'chats', 'users', 'account']) {
+      $('tab-' + tab).classList.toggle('hidden', tab !== button.dataset.tab)
+    }
+
+    if (button.dataset.tab === 'leads') loadLeads()
+    if (button.dataset.tab === 'chats') loadChats()
+    if (button.dataset.tab === 'users') loadUsers()
+  })
+})
+
+// ---------- Заявки ----------
+
+async function loadLeads() {
+  const params = new URLSearchParams()
+  if ($('lead-status').value) params.set('status', $('lead-status').value)
+  if ($('lead-mine').checked) params.set('mine', 'true')
+
+  const leads = await api('/leads?' + params)
+
+  $('lead-list').innerHTML = leads.length ? leads.map((lead) => `
+    <div class="item ${lead.id === selectedLead ? 'selected' : ''}" data-id="${lead.id}">
+      <div class="row">
+        <strong>№${lead.id} · ${esc(lead.name)}</strong>
+        <span class="badge s-${lead.status}">${STATUS[lead.status]}</span>
+      </div>
+      <div class="row muted">
+        <span>${esc(lead.source)}${lead.promotion ? ' · акция' : ''}</span>
+        <span>${esc(lead.created_local)}</span>
+      </div>
+      <div class="muted">${lead.assigned_name ? 'Взял(а): ' + esc(lead.assigned_name) : 'Не взята'}</div>
+    </div>`).join('') : '<p class="muted" style="padding:12px">Заявок нет</p>'
+
+  $('lead-list').querySelectorAll('.item').forEach((el) => {
+    el.addEventListener('click', () => openLead(Number(el.dataset.id)))
+  })
+}
+
+$('lead-status').addEventListener('change', loadLeads)
+$('lead-mine').addEventListener('change', loadLeads)
+
+async function openLead(id) {
+  selectedLead = id
+  $('tab-leads').classList.add('show-detail')
+  const { lead, events } = await api('/leads/' + id)
+  const canChangeStatus = me.role === 'admin' || !lead.assigned_user_id || lead.assigned_user_id === me.id
+
+  const details = lead.details
+    ? Object.entries(lead.details).map(([k, v]) => `<dt>${esc(k)}</dt><dd>${esc(v)}</dd>`).join('')
+    : ''
+
+  $('lead-detail').innerHTML = `
+    <button class="back" id="lead-back">← К списку</button>
+    <h2>Заявка №${lead.id} <span class="badge s-${lead.status}">${STATUS[lead.status]}</span></h2>
+    <dl class="facts">
+      <dt>Получена</dt><dd>${esc(lead.created_local)}</dd>
+      <dt>Имя</dt><dd>${esc(lead.name)}</dd>
+      <dt>Телефон</dt><dd><a href="tel:${esc(lead.phone.replace(/[^\d+]/g, ''))}">${esc(lead.phone)}</a></dd>
+      <dt>Источник</dt><dd>${esc(lead.source)}</dd>
+      ${lead.promotion ? `<dt>Акция</dt><dd>${esc(lead.promotion)}</dd>` : ''}
+      ${details}
+      <dt>Взял(а)</dt><dd>${lead.assigned_name ? esc(lead.assigned_name) + ' · ' + esc(lead.taken_local) : '—'}</dd>
+      ${lead.closed_local ? `<dt>Закрыта</dt><dd>${esc(lead.closed_local)}</dd>` : ''}
+    </dl>
+    <div class="actions">
+      ${!lead.assigned_user_id ? '<button class="primary" id="take">✋ Взять в работу</button>' : ''}
+      ${canChangeStatus ? `
+        <select id="status">${Object.entries(STATUS).map(([k, v]) =>
+          `<option value="${k}" ${k === lead.status ? 'selected' : ''}>${v}</option>`).join('')}</select>
+        <button id="save-status">Сменить статус</button>` : ''}
+      ${me.role === 'admin' ? `
+        <select id="assign"><option value="">— не назначена —</option>${users.filter((u) => u.active).map((u) =>
+          `<option value="${u.id}" ${u.id === lead.assigned_user_id ? 'selected' : ''}>${esc(u.display_name)}</option>`).join('')}</select>
+        <button id="save-assign">Назначить</button>` : ''}
+    </div>
+    <p class="error" id="lead-error"></p>
+    <h3>История</h3>
+    <div class="timeline">${events.map((e) => `
+      <div class="ev">
+        <div class="meta">${esc(e.created_local)} · ${esc(e.user_name || 'Система')}</div>
+        <div>${esc(e.text)}</div>
+      </div>`).join('')}</div>
+    <form id="comment-form">
+      <textarea name="text" placeholder="Что ответили клиенту, договорённости, результат звонка…" required maxlength="2000"></textarea>
+      <div class="actions"><button class="primary">Добавить комментарий</button></div>
+    </form>`
+
+  const run = async (fn) => {
+    try { await fn(); await openLead(id); loadLeads() } catch (error) { $('lead-error').textContent = error.message }
+  }
+
+  $('lead-back').onclick = () => $('tab-leads').classList.remove('show-detail')
+  if ($('take')) $('take').onclick = () => run(() => api(`/leads/${id}/take`, { method: 'POST' }))
+  if ($('save-status')) $('save-status').onclick = () => run(() => api(`/leads/${id}/status`, { method: 'POST', body: { status: $('status').value } }))
+  if ($('save-assign')) $('save-assign').onclick = () => run(() => api(`/leads/${id}/assign`, { method: 'POST', body: { user_id: $('assign').value ? Number($('assign').value) : null } }))
+  $('comment-form').onsubmit = (event) => {
+    event.preventDefault()
+    run(() => api(`/leads/${id}/comment`, { method: 'POST', body: { text: event.target.text.value } }))
+  }
+
+  loadLeads()
+}
+
+// ---------- Чаты ----------
+
+async function loadChats() {
+  const chats = await api('/chats')
+
+  $('chat-list').innerHTML = chats.length ? chats.map((chat) => `
+    <div class="item ${chat.id === selectedChat ? 'selected' : ''}" data-id="${chat.id}">
+      <div class="row">
+        <strong>Чат №${chat.id} · ${esc(chat.visitor_name || 'Посетитель')}</strong>
+        <span class="badge ${chat.last_author === 'visitor' && chat.status === 'open' ? 's-new' : 's-rejected'}">
+          ${chat.status === 'closed' ? 'Закрыт' : chat.last_author === 'visitor' ? 'Ждёт ответа' : 'Отвечено'}</span>
+      </div>
+      <div class="muted">${esc((chat.last_text || '').slice(0, 80))}</div>
+      <div class="row muted"><span>${esc(chat.assigned_name || '')}</span><span>${esc(chat.last_local)}</span></div>
+    </div>`).join('') : '<p class="muted" style="padding:12px">Чатов нет</p>'
+
+  $('chat-list').querySelectorAll('.item').forEach((el) => {
+    el.addEventListener('click', () => openChat(Number(el.dataset.id)))
+  })
+}
+
+async function openChat(id) {
+  selectedChat = id
+  $('tab-chats').classList.add('show-detail')
+  const messages = await api(`/chats/${id}/messages`)
+
+  $('chat-detail').innerHTML = `
+    <button class="back" id="chat-back">← К списку</button>
+    <h2>Чат №${id}</h2>
+    <div class="bubbles">${messages.map((m) => `
+      <div class="bubble ${m.author}">${esc(m.text)}
+        <div class="meta">${esc(m.created_local)}${m.user_name ? ' · ' + esc(m.user_name) : ''}</div>
+      </div>`).join('')}</div>
+    <form id="reply-form">
+      <textarea name="text" placeholder="Ответ посетителю" required maxlength="2000"></textarea>
+      <div class="actions">
+        <button class="primary">Отправить</button>
+        <button type="button" id="close-chat">Закрыть чат</button>
+      </div>
+      <p class="error" id="chat-error"></p>
+    </form>`
+
+  $('chat-back').onclick = () => $('tab-chats').classList.remove('show-detail')
+  $('reply-form').onsubmit = async (event) => {
+    event.preventDefault()
+    try {
+      await api(`/chats/${id}/reply`, { method: 'POST', body: { text: event.target.text.value } })
+      await openChat(id)
+    } catch (error) { $('chat-error').textContent = error.message }
+  }
+  $('close-chat').onclick = async () => {
+    await api(`/chats/${id}/status`, { method: 'POST', body: { status: 'closed' } })
+    loadChats()
+  }
+
+  loadChats()
+}
+
+// ---------- Пользователи ----------
+
+async function loadUsers() {
+  users = await api('/users')
+
+  $('user-list').innerHTML = users.map((u) => `
+    <tr data-id="${u.id}">
+      <td><strong>${esc(u.display_name)}</strong><div class="muted">${esc(u.username)}</div></td>
+      <td>${u.role === 'admin' ? 'Администратор' : 'Менеджер'}</td>
+      <td>${esc(u.telegram_user_id || '—')}</td>
+      <td>${u.active ? 'Активен' : '<span class="muted">Отключён</span>'}</td>
+      <td class="actions">
+        <button data-act="tg">Telegram ID</button>
+        <button data-act="password">Сбросить пароль</button>
+        ${u.id !== me.id ? `<button data-act="role">${u.role === 'admin' ? 'Сделать менеджером' : 'Сделать админом'}</button>
+        <button data-act="active">${u.active ? 'Отключить' : 'Включить'}</button>` : ''}
+      </td>
+    </tr>`).join('')
+
+  $('user-list').querySelectorAll('button').forEach((button) => {
+    button.addEventListener('click', () => {
+      const id = Number(button.closest('tr').dataset.id)
+      editUser(users.find((u) => u.id === id), button.dataset.act)
+    })
+  })
+}
+
+async function editUser(user, action) {
+  const body = {}
+
+  if (action === 'tg') {
+    const value = prompt('Telegram ID (пусто — отвязать):', user.telegram_user_id || '')
+    if (value === null) return
+    if (value.trim()) body.telegram_user_id = Number(value.trim())
+    else body.clear_telegram = true
+  }
+
+  if (action === 'password') {
+    const value = prompt('Новый пароль (от 10 символов):')
+    if (!value) return
+    body.password = value
+  }
+
+  if (action === 'role') body.role = user.role === 'admin' ? 'manager' : 'admin'
+  if (action === 'active') body.active = !user.active
+
+  try {
+    await api('/users/' + user.id, { method: 'PATCH', body })
+    loadUsers()
+  } catch (error) {
+    alert(error.message)
+  }
+}
+
+$('user-create').addEventListener('submit', async (event) => {
+  event.preventDefault()
+  const form = new FormData(event.target)
+  $('user-error').textContent = ''
+
+  try {
+    await api('/users', {
+      method: 'POST',
+      body: {
+        username: form.get('username'),
+        display_name: form.get('display_name'),
+        password: form.get('password'),
+        role: form.get('role'),
+        telegram_user_id: form.get('telegram_user_id') ? Number(form.get('telegram_user_id')) : null,
+      },
+    })
+    event.target.reset()
+    loadUsers()
+  } catch (error) {
+    $('user-error').textContent = error.message
+  }
+})
+
+// ---------- Пароль ----------
+
+$('password-form').addEventListener('submit', async (event) => {
+  event.preventDefault()
+  const form = new FormData(event.target)
+
+  try {
+    await api('/me/password', {
+      method: 'POST',
+      body: { old_password: form.get('old_password'), new_password: form.get('new_password') },
+    })
+    $('password-result').textContent = 'Пароль изменён'
+    event.target.reset()
+  } catch (error) {
+    $('password-result').textContent = error.message
+  }
+})
+
+// Список обновляется сам раз в 20 секунд
+setInterval(() => {
+  if ($('app').classList.contains('hidden')) return
+  if (!$('tab-leads').classList.contains('hidden')) loadLeads().catch(() => {})
+  if (!$('tab-chats').classList.contains('hidden')) {
+    loadChats().catch(() => {})
+  }
+}, 20000)
+
+api('/me')
+  .then((data) => { csrf = data.csrf_token; me = data.user; showApp() })
+  .catch(() => showLogin())
+</script>
+</body>
+</html>
