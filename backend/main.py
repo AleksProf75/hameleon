@@ -1,19 +1,27 @@
+import asyncio
 import logging
 import math
 import os
 import time
 import uuid
 from collections import deque
+from contextlib import asynccontextmanager
 from typing import Literal
 
-import httpx
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
+# Переменные окружения нужны модулям ниже уже при импорте
 load_dotenv()
+
+import admin_api  # noqa: E402
+import chat_api  # noqa: E402
+import crm  # noqa: E402
+import db  # noqa: E402
+import telegram_bot  # noqa: E402
 
 
 logging.basicConfig(
@@ -24,10 +32,28 @@ logging.basicConfig(
 logger = logging.getLogger("hameleon.leads")
 
 
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    db.init_db()
+    polling = asyncio.create_task(telegram_bot.polling_loop())
+
+    yield
+
+    polling.cancel()
+
+
 app = FastAPI(
     title="Хамелеон API",
     version="1.0.0",
+    lifespan=lifespan,
+    # Служебная документация API не нужна посетителям
+    docs_url=None,
+    redoc_url=None,
+    openapi_url=None,
 )
+
+app.include_router(admin_api.router)
+app.include_router(chat_api.router)
 
 
 # CORS нужен только при локальной разработке, когда фронтенд
@@ -47,18 +73,6 @@ if CORS_ORIGINS:
         allow_methods=["GET", "POST"],
         allow_headers=["Content-Type"],
     )
-
-
-TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
-
-TELEGRAM_CHAT_IDS = [
-    chat_id.strip()
-    for chat_id in os.getenv(
-        "TELEGRAM_CHAT_IDS",
-        os.getenv("TELEGRAM_CHAT_ID", ""),
-    ).split(",")
-    if chat_id.strip()
-]
 
 
 # Акции определяет сервер, а не браузер: сайт присылает только ID акции.
@@ -330,76 +344,28 @@ def format_lead_message(lead: LeadCreate) -> str:
     return message
 
 
-async def send_to_telegram(message: str, request_id: str) -> int:
-    """Отправляет сообщение во все чаты и возвращает число успешных доставок.
-
-    Ошибка возникает только если сообщение не дошло ни до одного чата:
-    иначе повтор заявки приведёт к дублям у тех, кто её уже получил.
-    """
-    if not TELEGRAM_BOT_TOKEN:
-        raise RuntimeError(
-            "В .env отсутствует TELEGRAM_BOT_TOKEN"
-        )
-
-    if not TELEGRAM_CHAT_IDS:
-        raise RuntimeError(
-            "В .env отсутствует TELEGRAM_CHAT_IDS"
-        )
-
-    url = (
-        f"https://api.telegram.org/"
-        f"bot{TELEGRAM_BOT_TOKEN}/sendMessage"
+def lead_record_fields(lead: LeadCreate) -> tuple[str | None, dict | None]:
+    """Акция и расчёт в виде, удобном для хранения и показа в панели."""
+    promotion = resolve_promotion(lead)
+    promotion_text = (
+        f"{promotion['title']} ({promotion['value']})" if promotion else None
     )
 
-    delivered = 0
-    failed = 0
+    details = None
 
-    async with httpx.AsyncClient() as client:
-        for chat_id in TELEGRAM_CHAT_IDS:
-            payload = {
-                "chat_id": chat_id,
-                "text": message,
-            }
+    if lead.calculator:
+        calculator = lead.calculator
+        details = {
+            "Ширина, м": calculator.width,
+            "Длина, м": calculator.length,
+            "Площадь, м²": calculator.calculated_area(),
+            "Тип потолка": calculator.ceiling_type,
+            "Углов": calculator.corners,
+            "Светильников": calculator.lights,
+            "Стоимость, ₽": calculator.calculated_price(),
+        }
 
-            try:
-                response = await client.post(
-                    url,
-                    json=payload,
-                    timeout=10.0,
-                )
-
-                if response.status_code == 200:
-                    delivered += 1
-                else:
-                    failed += 1
-                    # Ответ Telegram и chat_id не пишем в журнал
-                    logger.warning(
-                        "request_id=%s Telegram вернул статус %s",
-                        request_id,
-                        response.status_code,
-                    )
-
-            except httpx.HTTPError as error:
-                failed += 1
-                # Текст исключения может содержать URL с токеном бота
-                logger.warning(
-                    "request_id=%s ошибка соединения с Telegram: %s",
-                    request_id,
-                    type(error).__name__,
-                )
-
-    if delivered == 0:
-        raise RuntimeError("Заявка не доставлена ни в один чат Telegram")
-
-    if failed:
-        logger.warning(
-            "request_id=%s частичная доставка: успешно %d, ошибок %d",
-            request_id,
-            delivered,
-            failed,
-        )
-
-    return delivered
+    return promotion_text, details
 
 
 @app.post("/api/leads")
@@ -456,19 +422,40 @@ async def create_lead(lead: LeadCreate, request: Request):
 
     message = format_lead_message(lead)
 
-    try:
-        delivered = await send_to_telegram(message, request_id)
+    # Сначала сохраняем заявку: даже если Telegram недоступен,
+    # она не потеряется и будет видна в панели
+    lead_id = None
 
+    try:
+        promotion_text, details = lead_record_fields(lead)
+        lead_id = crm.create_lead(
+            SOURCE_LABELS.get(lead.source, lead.source),
+            lead.name,
+            lead.phone,
+            promotion_text,
+            details,
+        )
+        logger.info("request_id=%s сохранена как заявка №%s", request_id, lead_id)
     except Exception as error:
         logger.error(
-            "request_id=%s заявка не отправлена: %s",
+            "request_id=%s заявка не сохранена в базу: %s",
             request_id,
-            error,
+            type(error).__name__,
         )
 
+    try:
+        if lead_id:
+            delivered = await telegram_bot.notify_lead(lead_id, message)
+        else:
+            delivered = await telegram_bot.broadcast(message, "lead", 0)
+    except telegram_bot.TelegramError as error:
+        logger.error("request_id=%s Telegram: %s", request_id, error)
+        delivered = 0
+
+    if not delivered and not lead_id:
         raise HTTPException(
             status_code=500,
-            detail="Не удалось отправить заявку в Telegram",
+            detail="Не удалось отправить заявку",
         )
 
     logger.info(
