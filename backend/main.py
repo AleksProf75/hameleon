@@ -23,6 +23,11 @@ logging.basicConfig(
 
 logger = logging.getLogger("hameleon.leads")
 
+# httpx пишет в журнал адрес каждого запроса, а в адресе Telegram API
+# содержится токен бота. Оставляем от httpx только предупреждения.
+logging.getLogger("httpx").setLevel(logging.WARNING)
+logging.getLogger("httpcore").setLevel(logging.WARNING)
+
 
 app = FastAPI(
     title="Хамелеон API",
