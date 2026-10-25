@@ -171,6 +171,23 @@ def change_own_password(data: PasswordChange, user: dict = Depends(auth.current_
     return {"status": "ok"}
 
 
+# ---------- Сводка для автообновления панели ----------
+
+@router.get("/summary")
+def summary(user: dict = Depends(auth.current_user)):
+    """Счётчики и последние ID: по ним панель понимает, что пришло новое."""
+    return db.query_one(
+        "SELECT"
+        " (SELECT COUNT(*) FROM leads WHERE status = 'new') AS new_leads,"
+        " (SELECT COALESCE(MAX(id), 0) FROM leads) AS last_lead_id,"
+        " (SELECT COUNT(*) FROM chats c WHERE c.status = 'open' AND"
+        "   (SELECT author FROM chat_messages WHERE chat_id = c.id"
+        "    ORDER BY id DESC LIMIT 1) = 'visitor') AS waiting_chats,"
+        " (SELECT COALESCE(MAX(id), 0) FROM chat_messages"
+        "   WHERE author = 'visitor') AS last_visitor_message_id"
+    )
+
+
 # ---------- Заявки ----------
 
 @router.get("/leads")

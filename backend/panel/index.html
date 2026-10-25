@@ -40,6 +40,7 @@
   .item:hover { background: #f8f9fb; }
   .item.selected { background: #eef3fd; }
   .item .row { display: flex; justify-content: space-between; gap: 8px; }
+  .count { display: inline-block; min-width: 20px; padding: 0 6px; margin-left: 4px; border-radius: 10px; background: var(--bad); color: #fff; font-size: 12px; font-weight: 700; text-align: center; }
   .badge { font-size: 12px; padding: 1px 8px; border-radius: 10px; white-space: nowrap; }
   .s-new { background: #fdecec; color: var(--bad); }
   .s-in_work { background: #fff4e5; color: var(--warn); }
@@ -88,12 +89,15 @@
   <header>
     <span class="brand">🦎 Хамелеон</span>
     <nav>
-      <button data-tab="leads" class="active">Заявки</button>
-      <button data-tab="chats">Чаты</button>
+      <button data-tab="leads" class="active">Заявки <span class="count hidden" id="count-leads"></span></button>
+      <button data-tab="chats">Чаты <span class="count hidden" id="count-chats"></span></button>
       <button data-tab="users" class="admin-only">Пользователи</button>
       <button data-tab="account">Мой пароль</button>
     </nav>
-    <div class="who"><span id="who" class="muted"></span><button id="logout">Выйти</button></div>
+    <div class="who">
+      <button id="notify-btn" class="hidden" title="Звук и всплывающие уведомления о новых заявках и сообщениях">🔔 Включить уведомления</button>
+      <span id="who" class="muted"></span><button id="logout">Выйти</button>
+    </div>
   </header>
 
   <main id="tab-leads">
@@ -221,6 +225,7 @@ function showApp() {
 
   loadLeads()
   if (me.role === 'admin') loadUsers()
+  refresh().catch(() => {})
 }
 
 $('login').addEventListener('submit', async (event) => {
@@ -375,18 +380,33 @@ async function loadChats() {
   })
 }
 
+let chatMessageCount = 0
+
+// Обновляет только сообщения, не трогая набираемый ответ
+async function renderChatMessages(id) {
+  const messages = await api(`/chats/${id}/messages`)
+
+  if (id !== selectedChat || !$('chat-bubbles') || messages.length === chatMessageCount) {
+    return
+  }
+
+  chatMessageCount = messages.length
+  $('chat-bubbles').innerHTML = messages.map((m) => `
+    <div class="bubble ${m.author}">${esc(m.text)}
+      <div class="meta">${esc(m.created_local)}${m.user_name ? ' · ' + esc(m.user_name) : ''}</div>
+    </div>`).join('')
+  $('chat-bubbles').lastElementChild?.scrollIntoView({ block: 'nearest' })
+}
+
 async function openChat(id) {
   selectedChat = id
+  chatMessageCount = 0
   $('tab-chats').classList.add('show-detail')
-  const messages = await api(`/chats/${id}/messages`)
 
   $('chat-detail').innerHTML = `
     <button class="back" id="chat-back">← К списку</button>
     <h2>Чат №${id}</h2>
-    <div class="bubbles">${messages.map((m) => `
-      <div class="bubble ${m.author}">${esc(m.text)}
-        <div class="meta">${esc(m.created_local)}${m.user_name ? ' · ' + esc(m.user_name) : ''}</div>
-      </div>`).join('')}</div>
+    <div class="bubbles" id="chat-bubbles"></div>
     <form id="reply-form">
       <textarea name="text" placeholder="Ответ посетителю" required maxlength="2000"></textarea>
       <div class="actions">
@@ -401,7 +421,9 @@ async function openChat(id) {
     event.preventDefault()
     try {
       await api(`/chats/${id}/reply`, { method: 'POST', body: { text: event.target.text.value } })
-      await openChat(id)
+      event.target.reset()
+      await renderChatMessages(id)
+      loadChats()
     } catch (error) { $('chat-error').textContent = error.message }
   }
   $('close-chat').onclick = async () => {
@@ -409,6 +431,7 @@ async function openChat(id) {
     loadChats()
   }
 
+  await renderChatMessages(id)
   loadChats()
 }
 
@@ -507,14 +530,86 @@ $('password-form').addEventListener('submit', async (event) => {
   }
 })
 
-// Список обновляется сам раз в 20 секунд
-setInterval(() => {
-  if ($('app').classList.contains('hidden')) return
-  if (!$('tab-leads').classList.contains('hidden')) loadLeads().catch(() => {})
-  if (!$('tab-chats').classList.contains('hidden')) {
-    loadChats().catch(() => {})
+// ---------- Автообновление и уведомления ----------
+
+const REFRESH_MS = 5000
+const baseTitle = document.title
+let known = null
+
+function beep() {
+  try {
+    const ctx = new AudioContext()
+    const osc = ctx.createOscillator()
+    const gain = ctx.createGain()
+    osc.frequency.value = 880
+    gain.gain.setValueAtTime(0.2, ctx.currentTime)
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.5)
+    osc.connect(gain).connect(ctx.destination)
+    osc.start()
+    osc.stop(ctx.currentTime + 0.5)
+  } catch {
+    // Браузер не дал воспроизвести звук без действия пользователя
   }
-}, 20000)
+}
+
+function notify(text) {
+  beep()
+
+  if ('Notification' in window && Notification.permission === 'granted') {
+    const notification = new Notification('Хамелеон', { body: text, tag: text })
+    notification.onclick = () => { window.focus(); notification.close() }
+  }
+}
+
+function setCount(id, value) {
+  $(id).textContent = value
+  $(id).classList.toggle('hidden', !value)
+}
+
+async function refresh() {
+  if ($('app').classList.contains('hidden')) return
+
+  const summary = await api('/summary')
+  setCount('count-leads', summary.new_leads)
+  setCount('count-chats', summary.waiting_chats)
+
+  const attention = summary.new_leads + summary.waiting_chats
+  document.title = attention ? `(${attention}) ${baseTitle}` : baseTitle
+
+  if (known) {
+    if (summary.last_lead_id > known.last_lead_id) notify('Новая заявка с сайта')
+    if (summary.last_visitor_message_id > known.last_visitor_message_id) notify('Новое сообщение в чате')
+  }
+
+  known = summary
+
+  if (!$('tab-leads').classList.contains('hidden')) {
+    await loadLeads()
+
+    // Открытую заявку обновляем, только если менеджер ничего в ней не набирает
+    const typing = document.activeElement && ['TEXTAREA', 'SELECT', 'INPUT'].includes(document.activeElement.tagName)
+    const draft = document.querySelector('#comment-form textarea')?.value
+
+    if (selectedLead && !typing && !draft) await openLead(selectedLead)
+  }
+
+  if (!$('tab-chats').classList.contains('hidden')) {
+    await loadChats()
+    if (selectedChat) await renderChatMessages(selectedChat)
+  }
+}
+
+setInterval(() => refresh().catch(() => {}), REFRESH_MS)
+
+if ('Notification' in window && Notification.permission === 'default') {
+  $('notify-btn').classList.remove('hidden')
+}
+
+$('notify-btn').addEventListener('click', async () => {
+  beep()
+  await Notification.requestPermission()
+  $('notify-btn').classList.add('hidden')
+})
 
 api('/me')
   .then((data) => { csrf = data.csrf_token; me = data.user; showApp() })

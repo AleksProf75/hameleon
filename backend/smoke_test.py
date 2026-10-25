@@ -87,6 +87,10 @@ with TestClient(main.app) as client:
     anna = login(client, "anna")
     leads = client.get("/api/admin/leads").json()
     check(len(leads) == 1, "менеджер видит заявку")
+
+    counts = client.get("/api/admin/summary").json()
+    check(counts["new_leads"] == 1 and counts["last_lead_id"] == leads[0]["id"],
+          "сводка показывает новую заявку")
     lead_id = leads[0]["id"]
 
     detail = client.get(f"/api/admin/leads/{lead_id}").json()
@@ -136,6 +140,8 @@ with TestClient(main.app) as client:
 
     admin = login(client, "admin")
     chat_id = client.get("/api/admin/chats").json()[0]["id"]
+    check(client.get("/api/admin/summary").json()["waiting_chats"] == 1,
+          "сводка показывает чат, ждущий ответа")
     check(client.post(f"/api/admin/chats/{chat_id}/reply", headers=admin,
                       json={"text": "От 450 ₽ за м²"}).status_code == 200,
           "менеджер ответил в чат")
