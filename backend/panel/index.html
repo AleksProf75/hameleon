@@ -7,81 +7,137 @@
 <title>Хамелеон — заявки</title>
 <style>
   :root {
-    --bg: #f4f5f7; --card: #fff; --text: #1d2330; --muted: #6b7385;
-    --line: #e2e5ea; --accent: #2e6be6; --ok: #1f9d55; --warn: #d97706; --bad: #d14343;
+    --bg: #e9edf2; --card: #fff; --soft: #f5f7fa; --text: #172033; --muted: #66708a;
+    --line: #dde2ea; --accent: #2563eb; --accent-soft: #e7efff;
+    --ok: #15803d; --ok-soft: #e3f5e9; --warn: #b45309; --warn-soft: #fff1dc;
+    --bad: #dc2626; --bad-soft: #fde8e8; --gray-soft: #eceff3;
+    --header: #0f1b2b; --radius: 12px; --shadow: 0 1px 2px rgba(16,24,40,.06), 0 4px 14px rgba(16,24,40,.06);
   }
   * { box-sizing: border-box; }
-  body { margin: 0; font: 14px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; background: var(--bg); color: var(--text); }
-  button, input, select, textarea { font: inherit; }
-  button { cursor: pointer; border: 1px solid var(--line); background: var(--card); border-radius: 8px; padding: 7px 12px; }
+  body { margin: 0; font: 14px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; background: var(--bg); color: var(--text); }
+  button, input, select, textarea { font: inherit; color: inherit; }
+  button { cursor: pointer; border: 1px solid var(--line); background: var(--card); border-radius: 8px; padding: 7px 14px; font-weight: 500; transition: background .15s, border-color .15s; }
+  button:hover:not(:disabled) { border-color: #b9c2d0; background: var(--soft); }
   button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
-  button:disabled { opacity: .5; cursor: default; }
-  input, select, textarea { border: 1px solid var(--line); border-radius: 8px; padding: 7px 10px; background: #fff; width: 100%; }
-  textarea { resize: vertical; min-height: 70px; }
+  button.primary:hover:not(:disabled) { background: #1d4fd7; border-color: #1d4fd7; }
+  button.big { padding: 10px 18px; font-size: 15px; }
+  button:disabled { opacity: .45; cursor: default; }
+  input, select, textarea { border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; background: #fff; width: 100%; }
+  input:focus, select:focus, textarea:focus { outline: 2px solid var(--accent-soft); border-color: var(--accent); }
+  textarea { resize: vertical; min-height: 76px; }
   .hidden { display: none !important; }
   .muted { color: var(--muted); }
-  .error { color: var(--bad); min-height: 1.4em; }
+  .error { color: var(--bad); min-height: 1.4em; margin: 6px 0 0; }
 
-  #login { max-width: 340px; margin: 12vh auto; background: var(--card); padding: 28px; border-radius: 14px; box-shadow: 0 6px 24px rgba(0,0,0,.06); }
-  #login h1 { font-size: 20px; margin: 0 0 18px; }
-  #login label { display: block; margin-bottom: 12px; }
+  #login { max-width: 360px; margin: 12vh auto; background: var(--card); padding: 32px; border-radius: 16px; box-shadow: var(--shadow); }
+  #login h1 { font-size: 22px; margin: 0 0 20px; }
+  #login label { display: block; margin-bottom: 14px; color: var(--muted); font-size: 13px; }
 
-  header { display: flex; align-items: center; gap: 8px; padding: 10px 16px; background: var(--card); border-bottom: 1px solid var(--line); flex-wrap: wrap; }
-  header .brand { font-weight: 700; margin-right: 12px; }
+  /* Шапка */
+  header { display: flex; align-items: center; gap: 10px; padding: 10px 18px; background: var(--header); color: #fff; flex-wrap: wrap; position: sticky; top: 0; z-index: 5; }
+  header .brand { font-weight: 800; font-size: 16px; margin-right: 14px; }
   header nav { display: flex; gap: 4px; flex-wrap: wrap; }
-  header nav button.active { background: var(--text); color: #fff; border-color: var(--text); }
-  header .who { margin-left: auto; display: flex; gap: 8px; align-items: center; }
+  header nav button { background: transparent; border-color: transparent; color: #c9d3e3; }
+  header nav button:hover:not(:disabled) { background: rgba(255,255,255,.08); border-color: transparent; color: #fff; }
+  header nav button.active, header nav button.active:hover:not(:disabled) { background: #fff; color: var(--header); }
+  header .who { margin-left: auto; display: flex; gap: 10px; align-items: center; }
+  header .who button { background: transparent; border-color: rgba(255,255,255,.25); color: #fff; }
+  header .who button:hover:not(:disabled) { background: rgba(255,255,255,.1); border-color: rgba(255,255,255,.4); }
+  header .who .muted { color: #9fb0c8; }
+  .count { display: inline-block; min-width: 20px; padding: 0 6px; margin-left: 4px; border-radius: 10px; background: var(--bad); color: #fff; font-size: 12px; font-weight: 700; text-align: center; line-height: 18px; }
 
-  main { display: grid; grid-template-columns: minmax(280px, 420px) 1fr; gap: 16px; padding: 16px; height: calc(100vh - 58px); }
-  .panel { background: var(--card); border: 1px solid var(--line); border-radius: 12px; overflow: auto; }
-  .toolbar { display: flex; gap: 8px; padding: 10px; border-bottom: 1px solid var(--line); position: sticky; top: 0; background: var(--card); flex-wrap: wrap; }
+  /* Список и карточка */
+  main { display: grid; grid-template-columns: minmax(300px, 420px) 1fr; gap: 16px; padding: 16px; height: calc(100vh - 56px); }
+  .panel { background: var(--card); border-radius: var(--radius); box-shadow: var(--shadow); overflow: auto; }
+  .toolbar { display: flex; gap: 10px; padding: 12px; border-bottom: 1px solid var(--line); position: sticky; top: 0; background: var(--card); flex-wrap: wrap; align-items: center; z-index: 1; }
   .toolbar select { width: auto; }
-  .item { padding: 10px 12px; border-bottom: 1px solid var(--line); cursor: pointer; }
-  .item:hover { background: #f8f9fb; }
-  .item.selected { background: #eef3fd; }
-  .item .row { display: flex; justify-content: space-between; gap: 8px; }
-  .count { display: inline-block; min-width: 20px; padding: 0 6px; margin-left: 4px; border-radius: 10px; background: var(--bad); color: #fff; font-size: 12px; font-weight: 700; text-align: center; }
-  .badge { font-size: 12px; padding: 1px 8px; border-radius: 10px; white-space: nowrap; }
-  .s-new { background: #fdecec; color: var(--bad); }
-  .s-in_work { background: #fff4e5; color: var(--warn); }
-  .s-done { background: #e8f6ee; color: var(--ok); }
-  .s-rejected { background: #eceef2; color: var(--muted); }
-  .detail { padding: 18px; }
-  .detail h2 { margin: 0 0 4px; font-size: 18px; }
-  .facts { display: grid; grid-template-columns: max-content 1fr; gap: 4px 14px; margin: 14px 0; }
+  .toolbar label { display: flex; gap: 6px; align-items: center; color: var(--muted); }
+  .toolbar label input { width: auto; }
+  .item { padding: 12px 14px 12px 14px; border-bottom: 1px solid var(--line); cursor: pointer; border-left: 4px solid transparent; }
+  .item:hover { background: var(--soft); }
+  .item.selected { background: var(--accent-soft); }
+  .item.st-new { border-left-color: var(--bad); }
+  .item.st-in_work { border-left-color: #f59e0b; }
+  .item.st-done { border-left-color: #22c55e; }
+  .item.st-rejected { border-left-color: #a3acba; }
+  .item .row { display: flex; justify-content: space-between; gap: 8px; align-items: center; }
+  .item .name { font-size: 15px; font-weight: 600; }
+  .item.st-new .name { font-weight: 800; }
+  .item .sub { color: var(--muted); font-size: 13px; }
+  .item .who-line { font-size: 13px; margin-top: 2px; }
+  .badge { font-size: 12px; font-weight: 600; padding: 2px 10px; border-radius: 999px; white-space: nowrap; }
+  .s-new { background: var(--bad-soft); color: var(--bad); }
+  .s-in_work { background: var(--warn-soft); color: var(--warn); }
+  .s-done { background: var(--ok-soft); color: var(--ok); }
+  .s-rejected { background: var(--gray-soft); color: var(--muted); }
+
+  .detail { padding: 22px; }
+  .detail-head { display: flex; justify-content: space-between; gap: 12px; align-items: flex-start; flex-wrap: wrap; }
+  .detail h2 { margin: 0; font-size: 22px; }
+  .detail .num { color: var(--muted); font-size: 13px; }
+  .phone { display: inline-block; margin-top: 4px; font-size: 18px; font-weight: 700; color: var(--accent); text-decoration: none; }
+  .phone:hover { text-decoration: underline; }
+  .block { background: var(--soft); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; margin-top: 16px; }
+  .block h3 { margin: 0 0 10px; font-size: 12px; text-transform: uppercase; letter-spacing: .5px; color: var(--muted); }
+  .facts { display: grid; grid-template-columns: max-content 1fr; gap: 6px 18px; margin: 0; }
   .facts dt { color: var(--muted); }
-  .facts dd { margin: 0; }
-  .actions { display: flex; gap: 8px; flex-wrap: wrap; margin: 12px 0; align-items: center; }
-  .actions select { width: auto; }
-  .timeline { border-left: 2px solid var(--line); margin: 16px 0 16px 6px; padding-left: 14px; }
-  .timeline .ev { margin-bottom: 10px; }
+  .facts dd { margin: 0; font-weight: 500; }
+  .actions { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  .actions select { width: auto; min-width: 140px; }
+  .take-banner { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; background: var(--bad-soft); border: 1px solid #f7c6c6; border-radius: 10px; padding: 12px 16px; margin-top: 16px; font-weight: 600; color: var(--bad); }
+
+  .timeline { margin: 0; padding: 0; }
+  .timeline .ev { position: relative; padding: 0 0 14px 24px; }
+  .timeline .ev::before { content: ""; position: absolute; left: 3px; top: 6px; width: 10px; height: 10px; border-radius: 50%; background: #a3acba; }
+  .timeline .ev::after { content: ""; position: absolute; left: 7px; top: 19px; bottom: 0; width: 2px; background: var(--line); }
+  .timeline .ev:last-child { padding-bottom: 0; }
+  .timeline .ev:last-child::after { display: none; }
+  .timeline .ev.k-created::before { background: var(--bad); }
+  .timeline .ev.k-taken::before, .timeline .ev.k-assigned::before { background: #f59e0b; }
+  .timeline .ev.k-comment::before { background: var(--accent); }
+  .timeline .ev.k-status::before { background: #22c55e; }
   .timeline .ev .meta { color: var(--muted); font-size: 12px; }
-  .bubbles { display: flex; flex-direction: column; gap: 8px; margin: 12px 0; }
-  .bubble { max-width: 75%; padding: 8px 12px; border-radius: 12px; background: #eef0f4; white-space: pre-wrap; word-wrap: break-word; }
-  .bubble.manager { align-self: flex-end; background: #e3ecfd; }
-  .bubble .meta { font-size: 11px; color: var(--muted); margin-top: 2px; }
+  .timeline .ev.k-comment .text { background: #fff; border: 1px solid var(--line); border-radius: 8px; padding: 6px 10px; margin-top: 2px; white-space: pre-wrap; }
+
+  /* Чат */
+  .bubbles { display: flex; flex-direction: column; gap: 10px; padding: 16px; background: var(--soft); border: 1px solid var(--line); border-radius: 10px; margin: 16px 0; max-height: 55vh; overflow: auto; }
+  .bubble { max-width: 75%; padding: 9px 13px; border-radius: 14px; background: #fff; border: 1px solid var(--line); word-wrap: break-word; }
+  .bubble .msg { white-space: pre-wrap; }
+  .bubble.visitor { align-self: flex-start; border-bottom-left-radius: 4px; }
+  .bubble.manager { align-self: flex-end; background: var(--accent); border-color: var(--accent); color: #fff; border-bottom-right-radius: 4px; }
+  .bubble .meta { font-size: 11px; color: var(--muted); margin-top: 3px; }
+  .bubble.manager .meta { color: #d6e2ff; }
+
+  /* Таблицы и формы */
   table { border-collapse: collapse; width: 100%; }
-  th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
-  .grid-form { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 8px; align-items: end; padding: 14px; }
+  th { text-align: left; padding: 10px 14px; font-size: 12px; text-transform: uppercase; letter-spacing: .4px; color: var(--muted); background: var(--soft); border-bottom: 1px solid var(--line); }
+  td { text-align: left; padding: 10px 14px; border-bottom: 1px solid var(--line); vertical-align: middle; }
+  .grid-form { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 10px; align-items: end; padding: 16px; }
+  .grid-form label { color: var(--muted); font-size: 13px; }
   .single { grid-column: 1 / -1; }
-  .settings h3 { margin: 0; padding: 16px 14px 0; }
+  .page { padding: 16px; max-width: 1000px; }
+  .page > .panel + .panel { margin-top: 16px; }
+
+  .settings h3 { margin: 0; padding: 18px 16px 4px; font-size: 16px; border-top: 1px solid var(--line); }
+  .settings h3:first-child { border-top: 0; }
   .settings label { display: block; font-size: 13px; color: var(--muted); }
-  .settings label input, .settings label textarea { color: var(--text); margin-top: 2px; }
-  .promo { border: 1px solid var(--line); border-radius: 10px; margin: 10px 14px; padding: 10px; display: grid; grid-template-columns: 110px 1fr 1fr; gap: 8px; }
+  .settings label input, .settings label textarea { margin-top: 3px; }
+  .promo { background: var(--soft); border: 1px solid var(--line); border-radius: 10px; margin: 10px 16px; padding: 12px; display: grid; grid-template-columns: 110px 1fr 1fr; gap: 10px; }
   .promo .wide { grid-column: 1 / -1; }
   .promo .tools { grid-column: 1 / -1; display: flex; gap: 6px; justify-content: flex-end; }
-  .card-row { display: grid; grid-template-columns: 1fr 2fr 1fr; gap: 8px; margin: 8px 14px; }
-  .save-bar { position: sticky; bottom: 0; background: var(--card); border-top: 1px solid var(--line); padding: 12px 14px; margin: 16px 0 0; }
-  @media (max-width: 760px) { .promo, .card-row { grid-template-columns: 1fr; } }
+  .card-row { display: grid; grid-template-columns: 1fr 2fr 1fr; gap: 10px; margin: 8px 16px; }
+  .save-bar { position: sticky; bottom: 0; background: var(--card); border-top: 1px solid var(--line); padding: 14px 16px; margin: 16px 0 0; box-shadow: 0 -6px 14px rgba(16,24,40,.05); }
+
+  .back { display: none; }
 
   @media (max-width: 760px) {
-    main { grid-template-columns: 1fr; height: auto; }
-    .panel { max-height: none; }
+    main { grid-template-columns: 1fr; height: auto; padding: 10px; }
     main.show-detail .list { display: none; }
     main:not(.show-detail) .side { display: none; }
+    .back { display: inline-block; margin-bottom: 12px; }
+    .promo, .card-row { grid-template-columns: 1fr; }
+    .detail { padding: 16px; }
   }
-  .back { display: none; }
-  @media (max-width: 760px) { .back { display: inline-block; margin-bottom: 10px; } }
 </style>
 </head>
 <body>
@@ -120,8 +176,8 @@
           <option value="done">Выполненные</option>
           <option value="rejected">Отказ</option>
         </select>
-        <label class="muted" style="display:flex;gap:6px;align-items:center;width:auto">
-          <input type="checkbox" id="lead-mine" style="width:auto"> Мои
+        <label>
+          <input type="checkbox" id="lead-mine"> Только мои
         </label>
       </div>
       <div id="lead-list"></div>
@@ -134,7 +190,7 @@
     <section class="panel side"><div class="detail" id="chat-detail"><p class="muted">Выберите чат слева</p></div></section>
   </main>
 
-  <div id="tab-users" class="hidden" style="padding:16px">
+  <div id="tab-users" class="hidden page">
     <section class="panel">
       <form id="user-create" class="grid-form">
         <strong class="single">Новый пользователь</strong>
@@ -157,7 +213,7 @@
       После привязки он сможет брать заявки кнопкой «Беру» и отвечать в Telegram.</p>
   </div>
 
-  <div id="tab-settings" class="hidden" style="padding:16px;max-width:980px">
+  <div id="tab-settings" class="hidden page">
     <section class="panel settings">
       <h3>Акция на главном экране</h3>
       <div class="grid-form" id="set-hero"></div>
@@ -187,7 +243,7 @@
       используются и для расчёта стоимости в заявках.</p>
   </div>
 
-  <div id="tab-account" class="hidden" style="padding:16px;max-width:420px">
+  <div id="tab-account" class="hidden page" style="max-width:440px">
     <section class="panel">
       <form id="password-form" class="grid-form">
         <strong class="single">Смена пароля</strong>
@@ -318,17 +374,19 @@ async function loadLeads() {
   const leads = await api('/leads?' + params)
 
   $('lead-list').innerHTML = leads.length ? leads.map((lead) => `
-    <div class="item ${lead.id === selectedLead ? 'selected' : ''}" data-id="${lead.id}">
+    <div class="item st-${lead.status} ${lead.id === selectedLead ? 'selected' : ''}" data-id="${lead.id}">
       <div class="row">
-        <strong>№${lead.id} · ${esc(lead.name)}</strong>
+        <span class="name">${esc(lead.name)}</span>
         <span class="badge s-${lead.status}">${STATUS[lead.status]}</span>
       </div>
-      <div class="row muted">
-        <span>${esc(lead.source)}${lead.promotion ? ' · акция' : ''}</span>
+      <div class="row sub">
+        <span>№${lead.id} · ${esc(lead.source)}${lead.promotion ? ' · 🎁 акция' : ''}</span>
         <span>${esc(lead.created_local)}</span>
       </div>
-      <div class="muted">${lead.assigned_name ? 'Взял(а): ' + esc(lead.assigned_name) : 'Не взята'}</div>
-    </div>`).join('') : '<p class="muted" style="padding:12px">Заявок нет</p>'
+      <div class="who-line">${lead.assigned_name
+        ? '👤 ' + esc(lead.assigned_name)
+        : '<span style="color:var(--bad)">Никто не взял</span>'}</div>
+    </div>`).join('') : '<p class="muted" style="padding:16px">Заявок нет</p>'
 
   $('lead-list').querySelectorAll('.item').forEach((el) => {
     el.addEventListener('click', () => openLead(Number(el.dataset.id)))
@@ -345,43 +403,68 @@ async function openLead(id) {
   const canChangeStatus = me.role === 'admin' || !lead.assigned_user_id || lead.assigned_user_id === me.id
 
   const details = lead.details
-    ? Object.entries(lead.details).map(([k, v]) => `<dt>${esc(k)}</dt><dd>${esc(v)}</dd>`).join('')
+    ? Object.entries(lead.details).map(([k, v]) => `<dt>${esc(k)}</dt><dd>${
+      esc(typeof v === 'number' ? v.toLocaleString('ru-RU') : v)}</dd>`).join('')
     : ''
 
   $('lead-detail').innerHTML = `
     <button class="back" id="lead-back">← К списку</button>
-    <h2>Заявка №${lead.id} <span class="badge s-${lead.status}">${STATUS[lead.status]}</span></h2>
-    <dl class="facts">
-      <dt>Получена</dt><dd>${esc(lead.created_local)}</dd>
-      <dt>Имя</dt><dd>${esc(lead.name)}</dd>
-      <dt>Телефон</dt><dd><a href="tel:${esc(lead.phone.replace(/[^\d+]/g, ''))}">${esc(lead.phone)}</a></dd>
-      <dt>Источник</dt><dd>${esc(lead.source)}</dd>
-      ${lead.promotion ? `<dt>Акция</dt><dd>${esc(lead.promotion)}</dd>` : ''}
-      ${details}
-      <dt>Взял(а)</dt><dd>${lead.assigned_name ? esc(lead.assigned_name) + ' · ' + esc(lead.taken_local) : '—'}</dd>
-      ${lead.closed_local ? `<dt>Закрыта</dt><dd>${esc(lead.closed_local)}</dd>` : ''}
-    </dl>
-    <div class="actions">
-      ${!lead.assigned_user_id ? '<button class="primary" id="take">✋ Взять в работу</button>' : ''}
-      ${canChangeStatus ? `
-        <select id="status">${Object.entries(STATUS).map(([k, v]) =>
-          `<option value="${k}" ${k === lead.status ? 'selected' : ''}>${v}</option>`).join('')}</select>
-        <button id="save-status">Сменить статус</button>` : ''}
-      ${me.role === 'admin' ? `
-        <select id="assign"><option value="">— не назначена —</option>${users.filter((u) => u.active).map((u) =>
-          `<option value="${u.id}" ${u.id === lead.assigned_user_id ? 'selected' : ''}>${esc(u.display_name)}</option>`).join('')}</select>
-        <button id="save-assign">Назначить</button>` : ''}
+    <div class="detail-head">
+      <div>
+        <div class="num">Заявка №${lead.id} · ${esc(lead.created_local)}</div>
+        <h2>${esc(lead.name)}</h2>
+        <a class="phone" href="tel:${esc(lead.phone.replace(/[^\d+]/g, ''))}">📞 ${esc(lead.phone)}</a>
+      </div>
+      <span class="badge s-${lead.status}" style="font-size:14px;padding:4px 14px">${STATUS[lead.status]}</span>
     </div>
+
+    ${!lead.assigned_user_id ? `
+      <div class="take-banner">
+        <span>Заявку ещё никто не взял</span>
+        <button class="primary big" id="take">✋ Взять в работу</button>
+      </div>` : ''}
+
+    <div class="block">
+      <h3>Заявка</h3>
+      <dl class="facts">
+        <dt>Источник</dt><dd>${esc(lead.source)}</dd>
+        ${lead.promotion ? `<dt>Акция</dt><dd>🎁 ${esc(lead.promotion)}</dd>` : ''}
+        <dt>Ответственный</dt><dd>${lead.assigned_name ? esc(lead.assigned_name) + ' <span class="muted">· взял(а) ' + esc(lead.taken_local) + '</span>' : '—'}</dd>
+        ${lead.closed_local ? `<dt>Закрыта</dt><dd>${esc(lead.closed_local)}</dd>` : ''}
+      </dl>
+    </div>
+
+    ${details ? `<div class="block"><h3>Расчёт потолка</h3><dl class="facts">${details}</dl></div>` : ''}
+
+    ${canChangeStatus || me.role === 'admin' ? `
+      <div class="block">
+        <h3>Управление</h3>
+        <div class="actions">
+          ${canChangeStatus ? `
+            <select id="status">${Object.entries(STATUS).map(([k, v]) =>
+              `<option value="${k}" ${k === lead.status ? 'selected' : ''}>${v}</option>`).join('')}</select>
+            <button id="save-status">Сменить статус</button>` : ''}
+          ${me.role === 'admin' ? `
+            <select id="assign"><option value="">— не назначена —</option>${users.filter((u) => u.active).map((u) =>
+              `<option value="${u.id}" ${u.id === lead.assigned_user_id ? 'selected' : ''}>${esc(u.display_name)}</option>`).join('')}</select>
+            <button id="save-assign">Назначить</button>` : ''}
+        </div>
+      </div>` : ''}
     <p class="error" id="lead-error"></p>
-    <h3>История</h3>
-    <div class="timeline">${events.map((e) => `
-      <div class="ev">
-        <div class="meta">${esc(e.created_local)} · ${esc(e.user_name || 'Система')}</div>
-        <div>${esc(e.text)}</div>
-      </div>`).join('')}</div>
-    <form id="comment-form">
+
+    <div class="block">
+      <h3>История</h3>
+      <div class="timeline">${events.map((e) => `
+        <div class="ev k-${esc(e.kind)}">
+          <div class="meta">${esc(e.created_local)} · ${esc(e.user_name || 'Система')}</div>
+          <div class="text">${esc(e.text)}</div>
+        </div>`).join('')}</div>
+    </div>
+
+    <form id="comment-form" class="block">
+      <h3>Комментарий</h3>
       <textarea name="text" placeholder="Что ответили клиенту, договорённости, результат звонка…" required maxlength="2000"></textarea>
-      <div class="actions"><button class="primary">Добавить комментарий</button></div>
+      <div class="actions" style="margin-top:10px"><button class="primary">Добавить комментарий</button></div>
     </form>`
 
   const run = async (fn) => {
@@ -406,9 +489,9 @@ async function loadChats() {
   const chats = await api('/chats')
 
   $('chat-list').innerHTML = chats.length ? chats.map((chat) => `
-    <div class="item ${chat.id === selectedChat ? 'selected' : ''}" data-id="${chat.id}">
+    <div class="item ${chat.status === 'closed' ? 'st-rejected' : chat.last_author === 'visitor' ? 'st-new' : 'st-done'} ${chat.id === selectedChat ? 'selected' : ''}" data-id="${chat.id}">
       <div class="row">
-        <strong>Чат №${chat.id} · ${esc(chat.visitor_name || 'Посетитель')}</strong>
+        <span class="name">${esc(chat.visitor_name || 'Посетитель')} <span class="muted" style="font-weight:400">· чат №${chat.id}</span></span>
         <span class="badge ${chat.last_author === 'visitor' && chat.status === 'open' ? 's-new' : 's-rejected'}">
           ${chat.status === 'closed' ? 'Закрыт' : chat.last_author === 'visitor' ? 'Ждёт ответа' : 'Отвечено'}</span>
       </div>
@@ -433,7 +516,8 @@ async function renderChatMessages(id) {
 
   chatMessageCount = messages.length
   $('chat-bubbles').innerHTML = messages.map((m) => `
-    <div class="bubble ${m.author}">${esc(m.text)}
+    <div class="bubble ${m.author}">
+      <div class="msg">${esc(m.text)}</div>
       <div class="meta">${esc(m.created_local)}${m.user_name ? ' · ' + esc(m.user_name) : ''}</div>
     </div>`).join('')
   $('chat-bubbles').lastElementChild?.scrollIntoView({ block: 'nearest' })
