@@ -130,7 +130,20 @@
 
   /* Акции и цены: закладки разделов и акций слева */
   .settings-page { max-width: 1200px; }
-  .settings-layout { display: grid; grid-template-columns: 200px auto 1fr; gap: 16px; align-items: start; }
+  .settings-layout { display: grid; grid-template-columns: 200px 1fr; gap: 16px; align-items: start; }
+  .settings-layout.with-sub { grid-template-columns: 200px 240px 1fr; }
+
+  /* Поля настроек: подпись тёмная и жирная, поле белое на сером фоне */
+  .settings .grid-form, .settings .edit-box { background: var(--soft); border: 1px solid var(--line); border-radius: 10px; margin: 8px 16px 16px; padding: 16px; }
+  .settings label { color: var(--text) !important; font-weight: 600; font-size: 13px !important; }
+  .settings label input, .settings label textarea, .settings td input { font-weight: 400; background: #fff; border-color: #c9d1dd; }
+  .settings .hint { display: block; font-weight: 400; color: var(--muted); font-size: 12px; margin-top: 2px; }
+  .settings table { margin: 0 16px; width: calc(100% - 32px); }
+  .settings td { padding: 6px 10px 6px 0; border-bottom: 0; }
+  .settings th { background: transparent; padding: 6px 10px 4px 0; border-bottom: 0; color: var(--text); font-weight: 700; }
+  .settings .table-box { background: var(--soft); border: 1px solid var(--line); border-radius: 10px; margin: 8px 16px 16px; padding: 12px 6px 12px 16px; }
+  .settings .table-box table { margin: 0; width: 100%; }
+  .settings .row-num { color: var(--muted); font-weight: 700; width: 28px; }
   .side-tabs { display: flex; flex-direction: column; gap: 4px; background: var(--card); border-radius: var(--radius); box-shadow: var(--shadow); padding: 8px; position: sticky; top: 72px; max-height: calc(100vh - 200px); overflow: auto; }
   .side-tabs.hidden { display: none; }
   .side-tabs.sub { width: 240px; }
@@ -144,7 +157,7 @@
   .settings h3 { border-top: 0; }
   .settings h3 ~ h3 { border-top: 1px solid var(--line); margin-top: 12px; }
   @media (max-width: 900px) {
-    .settings-layout { grid-template-columns: 1fr; }
+    .settings-layout, .settings-layout.with-sub { grid-template-columns: 1fr; }
     .side-tabs { flex-direction: row; flex-wrap: wrap; position: static; max-height: none; }
     .side-tabs.sub { width: auto; }
     .side-tabs .tab-title { display: inline; margin-left: 4px; }
@@ -676,6 +689,7 @@ function renderSettingsTabs() {
 
   const showPromos = settingsSection === 'promotions'
   $('set-promo-tabs').classList.toggle('hidden', !showPromos)
+  document.querySelector('.settings-layout').classList.toggle('with-sub', showPromos)
 
   if (showPromos) {
     $('set-promo-tabs').innerHTML = draft.promotions.map((p, i) => `
@@ -696,7 +710,8 @@ function renderSettingsBody() {
       <div class="grid-form">
         ${field('Выгода (крупно)', 'hero.value', { max: 20 })}
         ${field('Заголовок', 'hero.title', { max: 100 })}
-        <div class="single">${field('Текст в заявке', 'hero.text')}</div>
+        <div class="single">${field('Текст в заявке', 'hero.text', { textarea: true })}
+          <span class="hint">Посетители его не видят: он приходит менеджерам вместе с заявкой</span></div>
       </div>`
   }
 
@@ -722,7 +737,7 @@ function renderSettingsBody() {
   if (settingsSection === 'calculator') {
     html = `
       <h3>Типы потолка</h3>
-      <table>
+      <div class="table-box"><table>
         <thead><tr><th>Тип потолка</th><th>Цена за м², ₽</th><th></th></tr></thead>
         <tbody>${draft.calculator.types.map((t, i) => `
           <tr>
@@ -731,7 +746,7 @@ function renderSettingsBody() {
             <td><button type="button" data-remove-type="${i}" ${draft.calculator.types.length === 1 ? 'disabled' : ''}>Удалить</button></td>
           </tr>`).join('')}</tbody>
       </table>
-      <div class="actions" style="padding:12px 16px 0"><button type="button" id="add-type">+ Добавить тип</button></div>
+      <div class="actions" style="padding-top:8px"><button type="button" id="add-type">+ Добавить тип</button></div></div>
       <h3>Дополнительно</h3>
       <div class="grid-form">
         ${field('Цена за угол, ₽', 'calculator.price_per_corner', { number: true })}
@@ -740,12 +755,19 @@ function renderSettingsBody() {
   }
 
   if (settingsSection === 'cards') {
-    html = '<h3>Карточки прайса</h3>' + draft.price_cards.map((c, i) => `
-      <div class="card-row">
-        ${field('Помещение', `price_cards.${i}.room`, { max: 40 })}
-        ${field('Название', `price_cards.${i}.title`, { max: 60 })}
-        ${field('Цена', `price_cards.${i}.price`, { max: 30 })}
-      </div>`).join('') + '<div style="height:12px"></div>'
+    html = `
+      <h3>Карточки прайса</h3>
+      <div class="table-box"><table>
+        <thead><tr><th></th><th>Помещение</th><th>Название</th><th>Цена</th></tr></thead>
+        <tbody>${draft.price_cards.map((c, i) => `
+          <tr>
+            <td class="row-num">${i + 1}</td>
+            <td><input data-path="price_cards.${i}.room" value="${esc(c.room)}" maxlength="40"></td>
+            <td><input data-path="price_cards.${i}.title" value="${esc(c.title)}" maxlength="60"></td>
+            <td><input data-path="price_cards.${i}.price" value="${esc(c.price)}" maxlength="30"></td>
+          </tr>`).join('')}</tbody>
+      </table></div>
+      <p class="muted" style="padding:0 16px 8px">Номер — порядок карточки на сайте слева направо. Фотографии карточек меняются только в коде.</p>`
   }
 
   $('set-body').innerHTML = html
